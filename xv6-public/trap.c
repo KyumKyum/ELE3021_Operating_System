@@ -22,6 +22,7 @@ tvinit(void)
   for(i = 0; i < 256; i++)
     SETGATE(idt[i], 0, SEG_KCODE<<3, vectors[i], 0);
   SETGATE(idt[T_SYSCALL], 1, SEG_KCODE<<3, vectors[T_SYSCALL], DPL_USER);
+  SETGATE(idt[128], 1, SEG_KCODE<<3, vectors[128], DPL_USER); //Practice: enable another syscall entrypoint $128
 
   initlock(&tickslock, "time");
 }
@@ -43,6 +44,18 @@ trap(struct trapframe *tf)
     syscall();
     if(myproc()->killed)
       exit();
+    return;
+  }
+
+  if(tf->trapno == 128) { //Practice: new entrypoint for syscall
+    if(myproc()->killed) {
+      exit();
+    }
+    cprintf("User Interrupt %d called! \n", tf->trapno);
+    if(myproc()->killed){
+      exit();
+    }
+
     return;
   }
 
