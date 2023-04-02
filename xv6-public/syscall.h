@@ -21,3 +21,8 @@
 #define SYS_mkdir  20
 #define SYS_close  21
 #define SYS_myfunction 22
+#define SYS_yieldProc 23
+#define SYS_getLevel 24
+#define SYS_setPriority 25
+#define SYS_schedulerLock 26
+#define SYS_schedulerUnlock 27
