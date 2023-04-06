@@ -190,7 +190,6 @@ void            clearpteu(pde_t *pgdir, char *uva);
 int 		myfunction(char *);
 
 //Assignment
-void		yieldProc(void);
 int		getLevel(void);
 void		setPriority(int pid, int priority);
 void		schedulerLock(int password);

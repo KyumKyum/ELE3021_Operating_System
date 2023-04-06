@@ -104,7 +104,7 @@ extern int sys_wait(void);
 extern int sys_write(void);
 extern int sys_uptime(void);
 extern int sys_myfunction(void);
-extern int sys_yieldProc(void);
+extern int sys_yield(void);
 extern int sys_getLevel(void);
 extern int sys_setPriority(void);
 extern int sys_schedulerLock(void);
@@ -133,7 +133,7 @@ static int (*syscalls[])(void) = {
 [SYS_mkdir]   		sys_mkdir,
 [SYS_close]   		sys_close,
 [SYS_myfunction]    	sys_myfunction,
-[SYS_yieldProc]   	sys_yieldProc,
+[SYS_yield]   		sys_yield,
 [SYS_getLevel]		sys_getLevel,
 [SYS_setPriority]	sys_setPriority,
 [SYS_schedulerLock]	sys_schedulerLock,

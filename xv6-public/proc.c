@@ -391,6 +391,14 @@ yield(void)
   release(&ptable.lock);
 }
 
+//* Create Wrapper Function for yield()
+int sys_yield (void)
+{
+  cprintf("yield() called in proc.c\n");
+  yield();
+  return 0;
+}
+
 // A fork child's very first scheduling by scheduler()
 // will swtch here.  "Return" to user space.
 void

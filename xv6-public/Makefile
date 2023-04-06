@@ -28,7 +28,6 @@ OBJS = \
 	vectors.o\
 	vm.o\
 	prac_syscall.o\
-	yield.o\
 	getLevel.o\
 	setPriority.o\
 	schedulerLock.o\

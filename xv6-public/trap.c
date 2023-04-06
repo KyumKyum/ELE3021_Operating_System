@@ -23,6 +23,8 @@ tvinit(void)
     SETGATE(idt[i], 0, SEG_KCODE<<3, vectors[i], 0);
   SETGATE(idt[T_SYSCALL], 1, SEG_KCODE<<3, vectors[T_SYSCALL], DPL_USER);
   SETGATE(idt[128], 1, SEG_KCODE<<3, vectors[128], DPL_USER); //Practice: enable another syscall entrypoint $128
+  SETGATE(idt[129], 1, SEG_KCODE<<3, vectors[129], DPL_USER); //Assignment Implement: Interrupt 129 calls schedulerLock()
+  SETGATE(idt[130], 1, SEG_KCODE<<3, vectors[130], DPL_USER); //Assignmnet Implement: Interrupt 130 calls schedulerUnlock() 
 
   initlock(&tickslock, "time");
 }
@@ -52,6 +54,30 @@ trap(struct trapframe *tf)
       exit();
     }
     cprintf("User Interrupt %d called! \n", tf->trapno);
+    if(myproc()->killed){
+      exit();
+    }
+
+    return;
+  }
+
+  if(tf->trapno == 129) { //scheduleLock()
+    if(myproc()->killed){ //If current process is already killed, there is no reason to make this interrupt happen.
+      exit();
+    }
+    schedulerLock(1000);
+    if(myproc()->killed){ //After executing system call, if current process killed, exit.
+      exit();
+    }
+
+    return;
+  }
+
+  if(tf->trapno == 130) { //scheduleUnlock()
+    if(myproc()->killed){
+      exit();
+    }
+    schedulerUnlock(2000);
     if(myproc()->killed){
       exit();
     }
