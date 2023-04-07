@@ -1,3 +1,6 @@
+//* ELE3021 Project #1: Make MLFQ Scheduler
+//* Proc.h dedicated for MLFQ Queue
+
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -35,6 +38,8 @@ struct context {
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
 // Per-process state
+//
+//* New Process Structure: Process dedicated for MLFQ scheduling
 struct proc {
   uint sz;                     // Size of process memory (bytes)
   pde_t* pgdir;                // Page table
@@ -49,6 +54,8 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  int level;		       //* Queue Level: Show Current Process Level ( 0 - 2 )
+  int priority;		       //* Priority: Used for priority scheduling in L2 <- Higher priority in minimal number.
 };
 
 // Process memory is laid out contiguously, low addresses first:

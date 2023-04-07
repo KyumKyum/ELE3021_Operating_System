@@ -1,3 +1,5 @@
+# Implementing MLFQ: proc.o -> proc_mlfq.o
+
 OBJS = \
 	bio.o\
 	console.o\
@@ -14,7 +16,7 @@ OBJS = \
 	mp.o\
 	picirq.o\
 	pipe.o\
-	proc.o\
+	proc_mlfq.o\
 	sleeplock.o\
 	spinlock.o\
 	string.o\
