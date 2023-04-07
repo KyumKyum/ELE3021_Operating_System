@@ -95,7 +95,7 @@ allocproc(void)
   release(&ptable.lock);
   return 0;
 
-found:
+ found:
   int idx = 0; //* Used to search unused space at queue L0.
 
   p->state = EMBRYO;
@@ -106,7 +106,8 @@ found:
  for(idx = 0; idx < NPROC; idx++){
    if(L[0][idx] == 0) { //* If there is no assiged process for current index,
      L[0][idx] = p; //* Assign current process to index - Scheduled in L0 initially.
-     cprintf("Allocated Process: %s // Allocated in L0[%d]\n", p->name, idx);
+     p->idx = idx; //* Assign Index - current position
+     cprintf("Allocated Process: %s // PID: %d, Allocated in L0[%d]\n", p->name, p->pid, idx); //* Debug: Comment this line if it is not required.
      break;
    }
  }
@@ -307,8 +308,17 @@ wait(void)
         continue;
       havekids = 1;
       if(p->state == ZOMBIE){
-        // Found one.
-        pid = p->pid;
+	// Found one.
+
+	//* Remove current process from the queue.
+        int level = p->level;
+        int idx = p->idx;
+        L[level][idx] = 0;
+        //* Now, current cell is usuable for another new process.
+        
+	cprintf("RELEASED PROCESS -> PID: %d / LEVEL: %d / INDEX: %d / PRIORITY: %d\n", p->pid, p->level, p->idx, p->priority);
+
+	pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
         freevm(p->pgdir);
@@ -317,6 +327,11 @@ wait(void)
         p->name[0] = 0;
         p->killed = 0;
         p->state = UNUSED;
+	//* Reset property added for MLFQ.
+	p->level = 0;
+	p->idx = 0;
+	p->priority = 0;
+
         release(&ptable.lock);
         return pid;
       }
@@ -574,4 +589,67 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+//* Print all process in ptable. (Prints all process available and its state)
+void 
+printproc(void)
+{
+  struct proc *p;
+
+  cprintf("====================CURRENT PROCESS AVAILABLE====================\n");
+  cprintf("[PID] level / index / priority / state \n");
+  
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  {
+    if(p->state != UNUSED)
+    {
+      cprintf("[%d] %d / %d / %d\n", p->pid, p->level, p->idx, p->priority);
+    }
+  }
+}
+
+int sys_printproc(void)
+{
+  printproc();
+  exit();
+  return 0;
+}
+
+//* Print all process based on MLFQ. (Prints all process in MLFQ based on its level.)
+void 
+printmlfq(void)
+{
+  struct proc *p;
+  int level = 0;
+  int idx = 0;
+  cprintf("====================CURRENT MLFQ STATUS=====================\n");
+  cprintf("[PID] level / index / priority\n");
+
+  for(level = 0; level < 3; level++)
+  {
+    cprintf("*********************L%d ", level);
+    if(level == 0)
+      cprintf("- RR, Mostly Prioritized. ********************\n");
+    else if(level == 1)
+      cprintf("- RR, Took a backseat to L0. ********************\n");
+    else if(level == 2)
+      cprintf("- Priority Queue. FCFS for same priority ********************\n");
+
+    for(idx = 0; idx < NPROC; idx++)
+    {
+      if(L[level][idx] == 0)
+        continue;
+
+      p = L[level][idx];
+      cprintf("[%d] %d / %d / %d\n", p->pid, p->level, p->idx, p->priority);
+    }
+  }
+}
+
+int sys_printmlfq(void)
+{
+  printmlfq();
+  exit();
+  return 0;
 }

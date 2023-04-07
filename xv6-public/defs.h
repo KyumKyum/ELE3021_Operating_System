@@ -121,6 +121,10 @@ int             wait(void);
 void            wakeup(void*);
 void            yield(void);
 
+//* proc_mlfq.c: added from mlfq version.
+void		printproc(void);
+void		printmlfq(void);
+
 // swtch.S
 void            swtch(struct context**, struct context*);
 

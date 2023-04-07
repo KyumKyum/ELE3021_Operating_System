@@ -54,7 +54,8 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
-  int level;		       //* Queue Level: Show Current Process Level ( 0 - 2 )
+  int level;		       //* Queue Level: Show Current Process Level ( 0 - 2 );
+  int idx;		       //* Index: Indicates its index in queue (L0 ~ L2);
   int priority;		       //* Priority: Used for priority scheduling in L2 <- Higher priority in minimal number.
 };
 

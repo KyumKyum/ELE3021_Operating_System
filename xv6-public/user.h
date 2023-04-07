@@ -29,6 +29,8 @@ int getLevel(void);
 void setPriority(int, int);
 void schedulerLock(int);
 void schedulerUnlock(int);
+void printproc(void);
+void printmlfq(void);
 
 // ulib.c
 int stat(const char*, struct stat*);
