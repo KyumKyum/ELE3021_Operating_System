@@ -124,6 +124,7 @@ void            yield(void);
 //* proc_mlfq.c: added from mlfq version.
 void		printproc(void);
 void		printmlfq(void);
+int 		retlevel(void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

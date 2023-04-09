@@ -359,80 +359,96 @@ wait(void)
 
 
 //* ELE3021 - Project #1: Make MLFQ Scheduler
+//
+int
+retlevel(void)
+{ //* Return level of queue for next process
+  //* Searches for the Runnable, returns level where the RUNNABLE process firstly found.
+
+  int level = 0;
+  int idx = 0;
+
+  for(level = 0; level < MLFQ_LEV; level++)
+  {
+    if(level == 2){
+      //* If current level is 2, it means there is no RUNNABLE process for 0 and 1. It is reasonable for early return of level.
+      goto RET;
+    }
+    for(idx = 0; idx < NPROC; idx++)
+    {
+      if(L[level][idx] != 0 && L[level][idx]->state == RUNNABLE)
+      {
+        goto RET; //* If RUNNABLE process found, return current level.
+      }
+    }
+  }
+
+RET:
+  return level;
+}
+
 void
 scheduler(void)
 {
-  int level = 0; //* Level of queue
-  //int priority = 10; //* priority level: used at L2.
+  int lidx[3] = {0, 0, 0}; //* Index of each Queue - index needs to be memorized.
   struct proc *p;
-  //struct proc *tgt_p; //* tgt_proc: temporary store possible process in L2.
   struct cpu *c = mycpu();
   c->proc = 0;
-  
+
   for(;;){
-    //* Reset
+    int level = retlevel(); //* Level of queue - Initialize, determine the level of queue after the loop is over
     // Enable interrupts on this processor.
     sti();
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     
-   /* for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
-
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      c->proc = 0;
-    }*/
-    
-
-    //release(&ptable.lock);
-
     //* MLFQ Rule:
         // L0: RR, Mostly Prioritized.
         // L1: RR
         // L2: Priority Scheduling based on process->priority, FCFS for the same priority level.
-    //* Basic Idea: Looping over all three queues (L0 ~ L2)
-    	//* Outer Loop: Looping 0 to 2. Index indicates each level of queue.
-	//* Based on index, it jumps to dedicated for loop.
-	    //* For Loop RR: Dedicated Loop for L0, L1 <- Basic Round Robin. It loops till reaches NPROC (64).
-	    //* For Loop PQ: Dedicated Loop for L2. <- Priority Queue. It remembers firstly met process with highest priority, execute it.
-	//* If at least one process are executed, it searches RUNNABLE from L0 again. (Most Priorirized. - if new process comes L0, it has the most priority.) 
-    //* Outer Loop
-    for (level = 0; level < MLFQ_LEV; level++){
-      if(level != 2)
+    
+    int *idx = &lidx[level]; // * Index for Queue.
+
+    *idx = (*idx) % NPROC; //* Prevents overflow, also allows to restart the same queue for new process
+
+    for(; *idx < NPROC; (*idx)++)
+    {
+      //* Searches for level of queue needed to be executed.
+
+      int new_level = retlevel();
+      //*Check if level is different; if new level is smaller(priortized) than current level, the index must be reset to 0.
+
+      if(new_level < level)
       {
-        // *L0, L1 - Round Robin
-	int idx = 0; // * Index for Queue.
-	
-	for(idx = 0; idx < NPROC; idx++)
-	{
-	  if(L[level][idx] == 0)
-	    continue; // * empty cell - moves to next cell
-	  
-	  if(L[level][idx]->state != RUNNABLE)
-	    continue; // * Not runnable process - moves to next cell
-	  
-	  p = L[level][idx]; // *Assign current process.
-	  c->proc = p;
-	  switchuvm(p);
-	  p->state = RUNNING;
-
-	  //cprintf("[PID: %d] AT RUNNING STATE\n", p->pid);
-
-	  swtch(&(c->scheduler), p->context);
-	  switchkvm();
-
-	  //cprintf("[PID: %d] SWITCHED CONTEXT\n", p->pid);
-	  c->proc = 0;
-	}
+        lidx[new_level] = 0; //*Reset to 0.
       }
+      if(new_level != level)
+      {
+        level = new_level; //* changes to new level
+	if(lidx[level] >= NPROC) //* After switch, assume new queue reached the end of the queue, and needs to be reset.
+	  lidx[level] = lidx[level] % NPROC;
+        idx = &lidx[level];
+      }
+      //cprintf("Level: %d, Idx: %d\n", level, *idx);
+      if(L[level][*idx] == 0)
+        continue; // * empty cell - moves to next cell
+	  
+      if(L[level][*idx]->state != RUNNABLE)
+        continue; // * Not runnable process - moves to next cell
+	  
+      p = L[level][*idx]; // *Assign current process.
+      c->proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
+
+      //cprintf("[PID: %d] AT RUNNING STATE\n", p->pid);
+
+      swtch(&(c->scheduler), p->context);
+      switchkvm();
+
+      //cprintf("[PID: %d] SWITCHED CONTEXT\n", p->pid);
+      c->proc = 0;
     }
     release(&ptable.lock);
   }

@@ -1,4 +1,4 @@
-# Implementing MLFQ: proc.o -> proc_mlfq.o
+# Implementing MLFQ: proc.o -> proc_mlfq.o, trap.o -> trap_mlfq.o
 
 OBJS = \
 	bio.o\
@@ -25,7 +25,7 @@ OBJS = \
 	sysfile.o\
 	sysproc.o\
 	trapasm.o\
-	trap.o\
+	trap_mlfq.o\
 	uart.o\
 	vectors.o\
 	vm.o\
