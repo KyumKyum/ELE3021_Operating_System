@@ -512,7 +512,7 @@ scheduler(void)
 L2:
       int tgt_idx = -1; // * target process index;
       int priority = 1000; // * priority; initialized by the LOWEST value that can't be assigned to process.
-      //int arrived = 0; // * arrived: initialized by 0. It is initialized there is no cap for arrived, and first process (initial process) must be executed.
+      int arrived = -1; // * arrived: initialized by -1. It is initialized there is no cap for arrived; it needs to be initialized by the first process.
       int idx = 0; // * no need to memorize index for L2 -> search the whole L2 queue to find process every time.
 
       for(idx = 0; idx < NPROC; idx++)
@@ -521,13 +521,13 @@ L2:
           continue; // * empty cell - moves to next cell
         if(L[2][idx]->state != RUNNABLE) 
 	  continue; // * Not runnable process - moves to next cell
- 	if(L[2][idx]->priority > priority)
+ 	if(L[2][idx]->priority > priority || (L[2][idx]->arrived > arrived && arrived != -1)) // if arrived haven't be initialized, than arrived will not be included in condition.
 	  continue; // * Lower Priority or comes late - moves to next cell
 	
 	// * FOUND IT
 	tgt_idx = idx;
 	priority = L[2][idx]->priority; // * Update Value - It must be higher than this priority
-	//arrived = L[2][idx]->arrived; // * Update Value - It must arrive faster than this arrival time.
+	arrived = L[2][idx]->arrived; // * Update Value - It must arrive faster than this arrival time.
       }
       // * Execute the found process
       if(tgt_idx != -1 && priority != 1000)
