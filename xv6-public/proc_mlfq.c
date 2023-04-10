@@ -359,7 +359,8 @@ wait(void)
 
 
 //* ELE3021 - Project #1: Make MLFQ Scheduler
-//
+
+//retlevel: return level of queue has RUNNABLE process
 int
 retlevel(void)
 { //* Return level of queue for next process
@@ -385,6 +386,41 @@ retlevel(void)
 
 RET:
   return level;
+}
+
+//*demoteproc - demote process level to lower level.
+int
+demoteproc()
+{
+  if(myproc()-> level == 0) //* level 0 -> level 1
+  {
+    int idx = 0; //* new index for process.
+    
+    for(idx = 0; idx < NPROC; idx++)
+    {
+      if(L[1][idx] == 0) //* Empty cell found
+      {
+	L[0][myproc()->idx] = 0; //* remove current process from L0.
+	L[1][idx] = myproc(); //* Assign current process to L1.
+	myproc()->idx = idx; //* Gives new index for current queue.
+	myproc()->level = 1; //* Update process level.
+
+	cprintf("Demoted Process: %s (L0 -> L1)// PID: %d, Allocated in L1[%d]\n", myproc()->name, myproc()->pid, idx); //* Debug: Comment this line if it is not required.
+      	break; //* Exit Loop
+      }
+
+    }
+  }
+  else if(myproc() -> level == 1) //* level 1 -> level 2
+  {
+    //*TODO
+  }
+  else //* error case
+  {
+    panic("demoteproc()");
+  }
+
+  return 0;
 }
 
 void

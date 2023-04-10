@@ -141,9 +141,26 @@ trap(struct trapframe *tf)
 
   // Force process to give up CPU on clock tick.
   // If interrupts were on while locks held, would need to check nlock.
+  
+  //* Apply MLFQ: Different Time quantum for each queue level (2n + 4)
+    //* L0: 4 ticks
+    //* L1: 6 ticks
+    //* L2: 8 ticks
   if(myproc() && myproc()->state == RUNNING &&
      tf->trapno == T_IRQ0+IRQ_TIMER)
-    yield();
+  {
+    (myproc()->tq)++; //* Increase process time quantum
+    if(myproc()->tq >= rettq(myproc()->level))
+    { //* If allowed time quantum elapsed,
+      cprintf("Time Quantum for process %d had been expired!!(level %d, %d ticks)\n",myproc()->pid, myproc()->level, myproc()->tq);
+      myproc()->tq = 0;
+      //* Time Quantum Expired -> demote current process.
+      demoteproc(); //* Definition: proc_mlfq.c
+
+      yield();
+    }
+    //yield();
+  }
 
   // Check if the process has been killed since we yielded
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)

@@ -30,10 +30,7 @@ OBJS = \
 	vectors.o\
 	vm.o\
 	prac_syscall.o\
-	getLevel.o\
-	setPriority.o\
-	schedulerLock.o\
-	schedulerUnlock.o\
+	mlfqsyscall.o\
 
 # Cross-compiling (e.g., on Mac OS X)
 # TOOLPREFIX = i386-jos-elf

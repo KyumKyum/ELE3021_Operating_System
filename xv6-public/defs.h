@@ -125,6 +125,7 @@ void            yield(void);
 void		printproc(void);
 void		printmlfq(void);
 int 		retlevel(void);
+int		demoteproc(void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
@@ -194,11 +195,12 @@ void            clearpteu(pde_t *pgdir, char *uva);
 // prac_syscall.c
 int 		myfunction(char *);
 
-//Assignment
+//Project #1: mlfqsyscall.c
 int		getLevel(void);
 void		setPriority(int pid, int priority);
 void		schedulerLock(int password);
 void		schedulerUnlock(int password);
+int		rettq(int level);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
