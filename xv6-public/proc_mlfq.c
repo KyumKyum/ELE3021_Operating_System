@@ -18,7 +18,9 @@ struct {
 struct proc *L[MLFQ_LEV][NPROC] = {0}; //* Initialize as 0 (NULL) 
 //* L[0] => L0: Most prioritized process queue, RR, TQ: 4 ticks
 //* L[1] => L1: process queue, RR, TQ: 6 ticks
-//* L[2] => L2: process queue, Priority Scheduling based on proc()->priority, FCFS for same priority, TQ: 8 ticks
+//* L[2] => L2: process queue, Priority Scheduling based on proc()->priority, FCFS for same priority, TQ: 8 tick;
+
+uint arrived = 0; //* arrived - assign current value to process demoted to L2. The value will be increased proportional to number of process demoted to L2.
 
 static struct proc *initproc;
 
@@ -102,6 +104,7 @@ allocproc(void)
   p->pid = nextpid++;
   p->level = 0; //* Every new process are allocated at level 0.
   p->priority = 3; //* Default priority will be 3.
+  p->arrived = 0; //* Default arrived value will be 0.
 
  for(idx = 0; idx < NPROC; idx++){
    if(L[0][idx] == 0) { //* If there is no assiged process for current index,
@@ -331,6 +334,7 @@ wait(void)
 	p->level = 0;
 	p->idx = 0;
 	p->priority = 0;
+	p->arrived = 0;
 
         release(&ptable.lock);
         return pid;
@@ -390,32 +394,32 @@ RET:
 
 //*demoteproc - demote process level to lower level.
 int
-demoteproc()
+demoteproc(void)
 {
-  if(myproc()-> level == 0) //* level 0 -> level 1
+  if(myproc()->level < 2) //* level 0 -> level 1, level 1 -> level 2
   {
-    int idx = 0; //* new index for process.
+    int idx = 0; //* new index for demoted process.
+    int new_level = myproc()->level + 1;
     
     for(idx = 0; idx < NPROC; idx++)
     {
-      if(L[1][idx] == 0) //* Empty cell found
+      if(L[new_level][idx] == 0) //* Empty cell found
       {
-	L[0][myproc()->idx] = 0; //* remove current process from L0.
-	L[1][idx] = myproc(); //* Assign current process to L1.
+	L[myproc()->level][myproc()->idx] = 0; //* remove current process from previous level.
+	L[new_level][idx] = myproc(); //* Assign current process to new level.
 	myproc()->idx = idx; //* Gives new index for current queue.
-	myproc()->level = 1; //* Update process level.
+	myproc()->level = new_level; //* Update process level.
+	
+	if(new_level == 2) //* If new level is L2, gives new arrived value.
+	  myproc()->arrived = arrived++;
 
-	cprintf("Demoted Process: %s (L0 -> L1)// PID: %d, Allocated in L1[%d]\n", myproc()->name, myproc()->pid, idx); //* Debug: Comment this line if it is not required.
+	cprintf("Demoted Process: %s // PID: %d, Allocated in L%d[%d]\n", myproc()->name, myproc()->pid , myproc()->level, idx); //* Debug: Comment this line if it is not required.
       	break; //* Exit Loop
       }
 
     }
   }
-  else if(myproc() -> level == 1) //* level 1 -> level 2
-  {
-    //*TODO
-  }
-  else //* error case
+  else
   {
     panic("demoteproc()");
   }
@@ -423,10 +427,22 @@ demoteproc()
   return 0;
 }
 
+//* incpriority(): increase current priority level.
+void
+incpriority(void)
+{
+  if(myproc()-> priority > 0)
+    (myproc()->priority)--; //* Increase current priority;
+
+  cprintf("Increased Priority // PID: %d, Priority became %d\n", myproc()->pid, myproc()->priority); //* Debug: Comment this line if it is not required.
+
+  return;
+}
+
 void
 scheduler(void)
 {
-  int lidx[3] = {0, 0, 0}; //* Index of each Queue - index needs to be memorized.
+  int lidx[2] = {0, 0}; //* Index of each Queue - index for L0, L1 needs to be memorized.
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
@@ -444,47 +460,96 @@ scheduler(void)
         // L1: RR
         // L2: Priority Scheduling based on process->priority, FCFS for the same priority level.
     
-    int *idx = &lidx[level]; // * Index for Queue.
-
-    *idx = (*idx) % NPROC; //* Prevents overflow, also allows to restart the same queue for new process
-
-    for(; *idx < NPROC; (*idx)++)
+    if(level < 2) //* L0, L1 - RR
     {
-      //* Searches for level of queue needed to be executed.
+      int *idx = &lidx[level]; // * Index for Queue.
+      *idx = (*idx) % NPROC; //* Prevents overflow, also allows to restart the same queue for new process
 
-      int new_level = retlevel();
-      //*Check if level is different; if new level is smaller(priortized) than current level, the index must be reset to 0.
-
-      if(new_level < level)
+      for(; *idx < NPROC; (*idx)++)
       {
-        lidx[new_level] = 0; //*Reset to 0.
-      }
-      if(new_level != level)
-      {
-        level = new_level; //* changes to new level
-	if(lidx[level] >= NPROC) //* After switch, assume new queue reached the end of the queue, and needs to be reset.
-	  lidx[level] = lidx[level] % NPROC;
-        idx = &lidx[level];
-      }
-      //cprintf("Level: %d, Idx: %d\n", level, *idx);
-      if(L[level][*idx] == 0)
-        continue; // * empty cell - moves to next cell
+        //* Searches for level of queue needed to be executed.
+
+        int new_level = retlevel();
+	//*Check if level is different; if new level is smaller(priortized) than current level, the index must be reset to 0.
+	if(new_level == 2) //* L2 - needs different logic - jumps to L2 logic
+  	  goto L2;
+
+        if(new_level < level)
+        {
+          lidx[new_level] = 0; //*Reset to 0.
+        }
+        if(new_level != level)
+        {
+          level = new_level; //* changes to new level
+	  if(lidx[level] >= NPROC) //* After switch, assume new queue reached the end of the queue, and needs to be reset.
+	    lidx[level] = lidx[level] % NPROC;
+          idx = &lidx[level];
+        }
+        //cprintf("Level: %d, Idx: %d\n", level, *idx);
+        if(L[level][*idx] == 0)
+          continue; // * empty cell - moves to next cell
 	  
-      if(L[level][*idx]->state != RUNNABLE)
-        continue; // * Not runnable process - moves to next cell
+        if(L[level][*idx]->state != RUNNABLE)
+          continue; // * Not runnable process - moves to next cell
 	  
-      p = L[level][*idx]; // *Assign current process.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
+        p = L[level][*idx]; // *Assign current process.
+        c->proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
 
-      //cprintf("[PID: %d] AT RUNNING STATE\n", p->pid);
+        //cprintf("[PID: %d] AT RUNNING STATE\n", p->pid);
 
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
 
-      //cprintf("[PID: %d] SWITCHED CONTEXT\n", p->pid);
-      c->proc = 0;
+        //cprintf("[PID: %d] SWITCHED CONTEXT\n", p->pid);
+        c->proc = 0;
+      }
+    //release(&ptable.lock);
+    }
+    else if(level == 2) // * L2 - Priority Queue based on process priority, FCFS for the same priority (Only executed if there are no runnable process in L0 and L1.)
+    {
+L2:
+      int tgt_idx = -1; // * target process index;
+      int priority = 1000; // * priority; initialized by the LOWEST value that can't be assigned to process.
+      //int arrived = 0; // * arrived: initialized by 0. It is initialized there is no cap for arrived, and first process (initial process) must be executed.
+      int idx = 0; // * no need to memorize index for L2 -> search the whole L2 queue to find process every time.
+
+      for(idx = 0; idx < NPROC; idx++)
+      { // * Find the highest priority with highest arrived value. 
+        if(L[2][idx] == 0)
+          continue; // * empty cell - moves to next cell
+        if(L[2][idx]->state != RUNNABLE) 
+	  continue; // * Not runnable process - moves to next cell
+ 	if(L[2][idx]->priority > priority)
+	  continue; // * Lower Priority or comes late - moves to next cell
+	
+	// * FOUND IT
+	tgt_idx = idx;
+	priority = L[2][idx]->priority; // * Update Value - It must be higher than this priority
+	//arrived = L[2][idx]->arrived; // * Update Value - It must arrive faster than this arrival time.
+      }
+      // * Execute the found process
+      if(tgt_idx != -1 && priority != 1000)
+      { // * Process Found: tgt_idx, priority must be updated for the targeting process
+	
+	p = L[2][tgt_idx]; // *Assign current process.
+        c->proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
+
+        //cprintf("[PID: %d] AT RUNNING STATE\n", p->pid);
+
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
+
+        //cprintf("[PID: %d] SWITCHED CONTEXT\n", p->pid);
+        c->proc = 0;
+      }
+    }
+    else //* ERROR
+    {
+      panic("MLFQ scheduler()");
     }
     release(&ptable.lock);
   }
@@ -709,7 +774,7 @@ printmlfq(void)
   int level = 0;
   int idx = 0;
   cprintf("====================CURRENT MLFQ STATUS=====================\n");
-  cprintf("[PID] level / index / priority\n");
+  cprintf("[PID] level / index / priority / (arrived: for L2)\n");
 
   for(level = 0; level < 3; level++)
   {
@@ -727,7 +792,10 @@ printmlfq(void)
         continue;
 
       p = L[level][idx];
-      cprintf("[%d] %d / %d / %d\n", p->pid, p->level, p->idx, p->priority);
+      if(level != 2)
+        cprintf("[%d] %d / %d / %d\n", p->pid, p->level, p->idx, p->priority);
+      else
+	cprintf("[%d] %d / %d / %d / %d\n", p->pid, p->level, p->idx, p->priority, p->arrived);
     }
   }
 }

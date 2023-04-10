@@ -154,8 +154,12 @@ trap(struct trapframe *tf)
     { //* If allowed time quantum elapsed,
       cprintf("Time Quantum for process %d had been expired!!(level %d, %d ticks)\n",myproc()->pid, myproc()->level, myproc()->tq);
       myproc()->tq = 0;
-      //* Time Quantum Expired -> demote current process.
-      demoteproc(); //* Definition: proc_mlfq.c
+
+      //*L2: Time Qunatum Expired -> increase current priority; 
+      if(myproc()->level == 2)
+        incpriority(); 
+      else //* Time Quantum Expired -> demote current process.
+        demoteproc(); //* Definition: proc_mlfq.c
 
       yield();
     }

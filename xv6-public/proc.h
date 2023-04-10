@@ -58,6 +58,7 @@ struct proc {
   int idx;		       //* Index: Indicates its index in queue (L0 ~ L2);
   int priority;		       //* Priority: Used for priority scheduling in L2 <- Higher priority in minimal number.
   int tq;		       //* Time Quantum: tq for each process.
+  uint arrived;		       //* Arrived: arrived order of process. Value will be assigned if it comes to L2. Based on this value, scheduler will decide process to execute for the same priority
 };
 
 // Process memory is laid out contiguously, low addresses first:
