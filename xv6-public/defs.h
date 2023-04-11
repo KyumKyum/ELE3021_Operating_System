@@ -127,6 +127,7 @@ void		printmlfq(void);
 int 		retlevel(void);
 int		demoteproc(void);
 void		incpriority(void);
+void		boostpriority(void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

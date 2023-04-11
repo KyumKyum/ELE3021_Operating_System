@@ -21,7 +21,7 @@ struct proc *L[MLFQ_LEV][NPROC] = {0}; //* Initialize as 0 (NULL)
 //* L[2] => L2: process queue, Priority Scheduling based on proc()->priority, FCFS for same priority, TQ: 8 tick;
 
 uint arrived = 0; //* arrived - assign current value to process demoted to L2. The value will be increased proportional to number of process demoted to L2.
-
+int lidx[2] = {0, 0}; //* Index of each Queue - index for L0, L1 needs to be memorized.
 static struct proc *initproc;
 
 int nextpid = 1;
@@ -102,6 +102,7 @@ allocproc(void)
 
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->tq = 0; //* Basic time quantum: 0
   p->level = 0; //* Every new process are allocated at level 0.
   p->priority = 3; //* Default priority will be 3.
   p->arrived = 0; //* Default arrived value will be 0.
@@ -335,6 +336,7 @@ wait(void)
 	p->idx = 0;
 	p->priority = 0;
 	p->arrived = 0;
+	p->tq = 0;
 
         release(&ptable.lock);
         return pid;
@@ -439,10 +441,39 @@ incpriority(void)
   return;
 }
 
+//* boostpriority() : do priority boosting
+void
+boostpriority(void)
+{ //* Boost the whole priority if global tick became 100.
+  struct proc* p;
+  int level = 0;
+  int idx = 0;
+  int new_idx=0;
+  //* Send the whole process in L0 and L2 to L0, reset its time quantum and priority.
+  //* relocate process in L0 either to eliminate empty cells between processes.
+  for(level = 0; level < MLFQ_LEV; level++)
+  {
+    for(idx = 0; idx < NPROC; idx++)
+    {
+      if(L[level][idx] == 0)
+        continue;
+
+      p = L[level][idx];
+      L[level][idx] = 0; //* Detatch process from the queue.
+      L[0][new_idx] = p; //* relocate current process to new process, increase new_idx value after this instruction.
+      p->tq = 0; //* Reset its time quantum.
+      p->level = 0; //* Reset its level.
+      p->idx = new_idx; //* Gives new index.
+      p->priority = 3; //* Reset its priority.
+
+      new_idx++; //* Increase new_idx value.
+    }
+  }
+}
+
 void
 scheduler(void)
 {
-  int lidx[2] = {0, 0}; //* Index of each Queue - index for L0, L1 needs to be memorized.
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;

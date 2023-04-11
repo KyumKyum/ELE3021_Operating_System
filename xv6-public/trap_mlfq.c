@@ -12,7 +12,7 @@
 struct gatedesc idt[256];
 extern uint vectors[];  // in vectors.S: array of 256 entry pointers
 struct spinlock tickslock;
-uint ticks;
+uint ticks; //* This Variable will work as a global tick.
 
 void
 tvinit(void)
@@ -90,6 +90,11 @@ trap(struct trapframe *tf)
     if(cpuid() == 0){
       acquire(&tickslock);
       ticks++;
+      //* Apply Priority Boosting based on global ticks.
+      if(ticks % 100 == 0) //* For each 100 global ticks,
+      { //* do priority boosting.
+	boostpriority(); //* defined in proc_mlfq.c
+      }
       wakeup(&ticks);
       release(&tickslock);
     }
@@ -149,7 +154,8 @@ trap(struct trapframe *tf)
   if(myproc() && myproc()->state == RUNNING &&
      tf->trapno == T_IRQ0+IRQ_TIMER)
   {
-    (myproc()->tq)++; //* Increase process time quantum
+    //cprintf("[TICK] %d\n",ticks);
+    (myproc()->tq)++; //* Increase process tick.
     if(myproc()->tq >= rettq(myproc()->level))
     { //* If allowed time quantum elapsed,
       cprintf("Time Quantum for process %d had been expired!!(level %d, %d ticks)\n",myproc()->pid, myproc()->level, myproc()->tq);
@@ -163,7 +169,7 @@ trap(struct trapframe *tf)
 
       yield();
     }
-    //yield();
+    //yield(); //* Changed yield code due to Piazza implementation direction https://piazza.com/class/lf0nppamy5p2hi/post/58
   }
 
   // Check if the process has been killed since we yielded
