@@ -128,6 +128,7 @@ int 		retlevel(void);
 int		demoteproc(void);
 void		incpriority(void);
 void		boostpriority(void);
+struct proc*    getproc(int pid);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

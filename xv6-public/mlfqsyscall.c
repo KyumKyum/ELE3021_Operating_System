@@ -22,12 +22,22 @@ getLevel(void)
 }
 
 //* setPriority()
-void 
+/*void 
 setPriority(int pid, int priority)
 {
-  cprintf("setPriority() called, pid: %d, priority: %d\n", pid, priority);
+  //cprintf("setPriority() called, pid: %d, priority: %d\n", pid, priority);
+  struct proc* p = getproc(pid);
+
+  if(p->pid == -1) // * There are no such process
+  {
+    cprintf("setPriority(): There are no such process having pid %d.\n", pid);
+  }
+  else
+  {
+    cprintf("FOUNDED: Pid - %d\n", p->pid);
+  }
   return;
-}
+}*/
 
 //* schedulerLock()
 void 
