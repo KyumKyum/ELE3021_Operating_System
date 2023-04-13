@@ -23,8 +23,9 @@ tvinit(void)
     SETGATE(idt[i], 0, SEG_KCODE<<3, vectors[i], 0);
   SETGATE(idt[T_SYSCALL], 1, SEG_KCODE<<3, vectors[T_SYSCALL], DPL_USER);
   SETGATE(idt[128], 1, SEG_KCODE<<3, vectors[128], DPL_USER); //Practice: enable another syscall entrypoint $128
-  SETGATE(idt[129], 1, SEG_KCODE<<3, vectors[129], DPL_USER); //Assignment Implement: Interrupt 129 calls schedulerLock()
-  SETGATE(idt[130], 1, SEG_KCODE<<3, vectors[130], DPL_USER); //Assignmnet Implement: Interrupt 130 calls schedulerUnlock() 
+  SETGATE(idt[129], 1, SEG_KCODE<<3, vectors[129], DPL_USER); //Interrupt Implement: Interrupt 129 calls schedulerLock()
+  SETGATE(idt[130], 1, SEG_KCODE<<3, vectors[130], DPL_USER); //Interrupt Implement: Interrupt 130 calls schedulerUnlock() 
+  SETGATE(idt[T_RSTGT], 1, SEG_KCODE<<3, vectors[131], DPL_USER); //* Reset Global Tick: called if scheduler Lock called.
 
   initlock(&tickslock, "time");
 }
@@ -49,6 +50,21 @@ trap(struct trapframe *tf)
     return;
   }
 
+  if(tf->trapno == T_RSTGT)
+  { //* Reset global tick
+    if(myproc()->killed)
+      exit();
+
+    acquire(&tickslock);
+    ticks = 0; //* Reset Tick;
+    wakeup(&ticks);
+    release(&tickslock);
+
+    if(myproc()->killed)
+      exit();
+    return;
+  }
+
   if(tf->trapno == 128) { //Practice: new entrypoint for syscall
     if(myproc()->killed) {
       exit();
@@ -65,7 +81,7 @@ trap(struct trapframe *tf)
     if(myproc()->killed){ //If current process is already killed, there is no reason to make this interrupt happen.
       exit();
     }
-    schedulerLock(1000);
+    schedulerLock(2019014266);
     if(myproc()->killed){ //After executing system call, if current process killed, exit.
       exit();
     }
@@ -77,7 +93,7 @@ trap(struct trapframe *tf)
     if(myproc()->killed){
       exit();
     }
-    schedulerUnlock(2000);
+    schedulerUnlock(2019014266);
     if(myproc()->killed){
       exit();
     }
@@ -92,7 +108,10 @@ trap(struct trapframe *tf)
       ticks++;
       //* Apply Priority Boosting based on global ticks.
       if(ticks % 100 == 0) //* For each 100 global ticks,
-      { //* do priority boosting.
+      { 
+	//* If there is a lock, nullify it.
+	nullifylock();
+	//* do priority boosting.
 	boostpriority(); //* defined in proc_mlfq.c
       }
       wakeup(&ticks);
@@ -155,18 +174,20 @@ trap(struct trapframe *tf)
      tf->trapno == T_IRQ0+IRQ_TIMER)
   {
     //cprintf("[TICK] %d\n",ticks);
-    (myproc()->tq)++; //* Increase process tick.
-    if(myproc()->tq >= rettq(myproc()->level))
+    (myproc()->tq)--; //* Increase process tick.
+    if(myproc()->tq <= 0) //*Time Quantum Expired
     { //* If allowed time quantum elapsed,
-      cprintf("Time Quantum for process %d had been expired!!(level %d, %d ticks)\n",myproc()->pid, myproc()->level, myproc()->tq);
-      myproc()->tq = 0;
+      cprintf("Time Quantum for process %d had been expired!!(level %d, %d ticks)\n",myproc()->pid, myproc()->level, rettq(myproc()));
 
       //*L2: Time Qunatum Expired -> increase current priority; 
       if(myproc()->level == 2)
-        incpriority(); 
+      {
+        incpriority();
+      }	
       else //* Time Quantum Expired -> demote current process.
+      {
         demoteproc(); //* Definition: proc_mlfq.c
-
+      }
       yield();
     }
     //yield(); //* Changed yield code due to Piazza implementation direction https://piazza.com/class/lf0nppamy5p2hi/post/58

@@ -129,6 +129,7 @@ int		demoteproc(void);
 void		incpriority(void);
 void		boostpriority(void);
 struct proc*    getproc(int pid);
+void		nullifylock(void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
@@ -203,7 +204,7 @@ int		getLevel(void);
 void		setPriority(int pid, int priority);
 void		schedulerLock(int password);
 void		schedulerUnlock(int password);
-int		rettq(int level);
+int		rettq(struct proc *p);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

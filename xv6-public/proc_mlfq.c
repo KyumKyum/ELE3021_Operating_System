@@ -8,6 +8,7 @@
 #include "spinlock.h"
 
 #define MLFQ_LEV 3 //* Define MLFQ Total Level: Used to indicate number of process in each level.
+#define LOCK_PW 2019014266 //* Define password for schedulerLock and schedulerUnlock system call.
 
 //* Ptable = Same as before, all process are managed in current ptable.
 struct {
@@ -23,6 +24,8 @@ struct proc *L[MLFQ_LEV][NPROC] = {0}; //* Initialize as 0 (NULL)
 uint arrived = 0; //* arrived - assign current value to process demoted to L2. The value will be increased proportional to number of process demoted to L2.
 int lidx[2] = {0, 0}; //* Index of each Queue - index for L0, L1 needs to be memorized.
 static struct proc *initproc;
+
+struct proc *lockedproc = 0; //* locked process will be located in here. Initialized as 0 (NULL)
 
 int nextpid = 1;
 extern void forkret(void);
@@ -102,15 +105,18 @@ allocproc(void)
 
   p->state = EMBRYO;
   p->pid = nextpid++;
-  p->tq = 0; //* Basic time quantum: 0
   p->level = 0; //* Every new process are allocated at level 0.
   p->priority = 3; //* Default priority will be 3.
   p->arrived = 0; //* Default arrived value will be 0.
+  p->lock = UNLOCKED; //* Default lock state will be UNLOCKED.
 
  for(idx = 0; idx < NPROC; idx++){
    if(L[0][idx] == 0) { //* If there is no assiged process for current index,
+     //cprintf("%s\n", L[0][idx]->state);
+	   
      L[0][idx] = p; //* Assign current process to index - Scheduled in L0 initially.
      p->idx = idx; //* Assign Index - current position
+     p->tq = 4; //* Assign Time Qunatum - Level 0 - 4 ticks
      cprintf("Allocated Process: %s // PID: %d, Allocated in L0[%d]\n", p->name, p->pid, idx); //* Debug: Comment this line if it is not required.
      break;
    }
@@ -258,6 +264,12 @@ exit(void)
   struct proc *p;
   int fd;
 
+  //* If current process called schedulerLock(), reset lockedproc, make scheduler work again.
+  lockedproc = 0;
+  //* It doesn't have to be returned into MLFQ, as current process will be became ZOMBIE state, which is became UNUSED state by its parent.
+  //* Current process will be terminated, so there is no meaning to waste the MLFQ space.
+  //* It doesn't call nullifylock();
+
   if(curproc == initproc)
     panic("init exiting");
 
@@ -337,10 +349,12 @@ wait(void)
 	p->priority = 0;
 	p->arrived = 0;
 	p->tq = 0;
+	p->lock = UNLOCKED;
 
         release(&ptable.lock);
         return pid;
       }
+ 
     }
 
     // No point waiting if we don't have any children.
@@ -411,6 +425,7 @@ demoteproc(void)
 	L[new_level][idx] = myproc(); //* Assign current process to new level.
 	myproc()->idx = idx; //* Gives new index for current queue.
 	myproc()->level = new_level; //* Update process level.
+	myproc()->tq = rettq(myproc()); //* Update new time quantum
 	
 	if(new_level == 2) //* If new level is L2, gives new arrived value.
 	  myproc()->arrived = arrived++;
@@ -433,6 +448,8 @@ demoteproc(void)
 void
 incpriority(void)
 {
+  myproc()->tq = rettq(myproc()); //* Reset Time Quantum
+
   if(myproc()-> priority > 0)
     (myproc()->priority)--; //* Increase current priority;
 
@@ -451,17 +468,23 @@ boostpriority(void)
   int new_idx=0;
   //* Send the whole process in L0 and L2 to L0, reset its time quantum and priority.
   //* relocate process in L0 either to eliminate empty cells between processes.
+ 
   for(level = 0; level < MLFQ_LEV; level++)
   {
     for(idx = 0; idx < NPROC; idx++)
     {
       if(L[level][idx] == 0)
         continue;
+      if(level == 0 && L[level][idx]->idx == new_idx) //* In level 0, there is no need to move the process to the same place.
+      {	
+	new_idx++;      
+        continue;
+      }
 
       p = L[level][idx];
       L[level][idx] = 0; //* Detatch process from the queue.
       L[0][new_idx] = p; //* relocate current process to new process, increase new_idx value after this instruction.
-      p->tq = 0; //* Reset its time quantum.
+      p->tq = 4; //* Reset its time quantum. (L0)
       p->level = 0; //* Reset its level.
       p->idx = new_idx; //* Gives new index.
       p->priority = 3; //* Reset its priority.
@@ -471,6 +494,44 @@ boostpriority(void)
   }
 }
 
+//* nullifylock() - nullify the lock, and relocate locked process to mlfq queue.
+
+void
+nullifylock(void)
+{
+  if(lockedproc != 0)
+  {
+    int idx = 0; //* Index for search amount of existing element in front of L0.
+    int mov = 0; //* Index used for moving
+
+    for(idx = 0; idx < NPROC; idx++) 
+    {
+      //* Make the space for locked process.
+      if(L[0][idx] != 0) //* Check amount of element to move
+        continue;
+
+      //* Empty element found!
+      for(mov = idx; mov > 0; mov--) //* move the element to the empty space one by one.
+      {
+        L[0][mov] = L[0][mov-1]; //* Moves one right.
+ 	L[0][mov]->idx = mov;
+      }
+
+      L[0][0] = lockedproc; //* Locatd Locked process to the frontmost element in L0.
+      lockedproc = 0;
+      L[0][0]->level = 0;
+      L[0][0]->tq = 4;
+      L[0][0]->idx = 0;
+      L[0][0]->priority = 3;
+      L[0][0]->lock = UNLOCKED;
+      break;
+    }
+  }
+  return;
+}
+
+
+//* setPriority(): set current process priority.
 void
 setPriority(int pid, int priority)
 {
@@ -478,13 +539,13 @@ setPriority(int pid, int priority)
 
   acquire(&ptable.lock);
 
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) //* Search process have such pid.
   {
     if(p->pid != pid)
       continue;
     else
     {
-      p->priority = priority;
+      p->priority = priority; //* Update Priority
       cprintf("Priority Set: Pid: %d, Priority: %d\n", p->pid, p->priority);
       break;
     }
@@ -492,6 +553,56 @@ setPriority(int pid, int priority)
 
   release(&ptable.lock);
 }	
+
+//* schedulerLock(): lock scheduler, monopolize CPU at 100 ticks maximum.
+void
+schedulerLock(int password)
+{
+  //cprintf("schedulerLock() called -> password: %d\n", password);
+  
+  if(lockedproc != 0)
+  {//( IGNORE: Some process already locked scheduler. It cannot be done.
+    cprintf("IGNORE: Scheduler already locked! Ignoring...\n");
+  }
+  else if(password != LOCK_PW)
+  {//* REJECT: Password didn't match
+   cprintf("REJECT: Password incorrect, forcing to stop current process...\n");
+   cprintf("[REJECTED PROCESS] Pid: %d / Time Quantum: %d / Level: %d\n", myproc()->pid, (2* myproc()->level)+4, myproc()->level);
+   kill(myproc()->pid);
+  }
+  else
+  { //* Lock scheduler.
+    myproc()->lock = LOCKED;
+    myproc()->tq = 100; //* Allocate 100 tick;
+    lockedproc = myproc();
+    L[myproc()->level][myproc()->idx] = 0; //* Remove current process from MLFQ.
+    __asm__("int $131"); //* Call interrupt: reset global tick to 0
+    cprintf("SCHEDULER LOCKED! - PID: %d\n", myproc()->pid);
+  }
+  return;
+}
+
+//( schedulerUnlock(): unlock scheduler, return current process to MLFQ.
+void
+schedulerUnlock(int password)
+{
+  if(lockedproc == 0)
+  { //* IGNORE: there are no process called schedulerLock. It cannot be done.
+    cprintf("INORE: Scheduler is not locked! Ignoring...\n");
+  }else if(password != LOCK_PW)
+  { //* REJECT: Password didn't match
+    cprintf("REJECT: Password incorrect, forcing to stop current process...\n");
+    cprintf("[REJECTED PROCESS] PID: %d / Time Qunatum: %d / Level: %d\n", myproc()->pid, (2*myproc()->level)+4, myproc()->level);
+    kill(myproc()->pid);
+  }
+  else 
+  { //* Unlock scheduler
+    nullifylock(); //* Nullify current lock, return locked process to MLFQ (To the most front index in L0.).
+    cprintf("SCHEDULER UNLOCKED! - PiD: %d\n", myproc()->pid); 
+  }
+
+  return;
+}
 
 void
 scheduler(void)
@@ -501,108 +612,114 @@ scheduler(void)
   c->proc = 0;
 
   for(;;){
-    int level = retlevel(); //* Level of queue - Initialize, determine the level of queue after the loop is over
     // Enable interrupts on this processor.
     sti();
-
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     
-    //* MLFQ Rule:
+    //* If scheduler is locked, MLFQ will not be in service.
+    if(lockedproc != 0)
+    { //* SCHEDULER LOCKED!
+
+    }
+    else
+    {
+      int level = retlevel(); //* Level of queue - Initialize, determine the level of queue after the loop is over
+      //* MLFQ Rule:
         // L0: RR, Mostly Prioritized.
         // L1: RR
         // L2: Priority Scheduling based on process->priority, FCFS for the same priority level.
     
-    if(level < 2) //* L0, L1 - RR
-    {
-      int *idx = &lidx[level]; // * Index for Queue.
-      *idx = (*idx) % NPROC; //* Prevents overflow, also allows to restart the same queue for new process
-
-      for(; *idx < NPROC; (*idx)++)
+      if(level < 2) //* L0, L1 - RR
       {
-        //* Searches for level of queue needed to be executed.
+        int *idx = &lidx[level]; // * Index for Queue.
+        *idx = (*idx) % NPROC; //* Prevents overflow, also allows to restart the same queue for new process
 
-        int new_level = retlevel();
-	//*Check if level is different; if new level is smaller(priortized) than current level, the index must be reset to 0.
-	if(new_level == 2) //* L2 - needs different logic - jumps to L2 logic
-  	  goto L2;
-
-        if(new_level < level)
+        for(; *idx < NPROC; (*idx)++)
         {
-          lidx[new_level] = 0; //*Reset to 0.
-        }
-        if(new_level != level)
-        {
-          level = new_level; //* changes to new level
-	  if(lidx[level] >= NPROC) //* After switch, assume new queue reached the end of the queue, and needs to be reset.
-	    lidx[level] = lidx[level] % NPROC;
-          idx = &lidx[level];
-        }
-        //cprintf("Level: %d, Idx: %d\n", level, *idx);
-        if(L[level][*idx] == 0)
-          continue; // * empty cell - moves to next cell
+          //* Searches for level of queue needed to be executed.
+
+          int new_level = retlevel();
+	  //*Check if level is different; if new level is smaller(priortized) than current level, the index must be reset to 0.
+	  if(new_level == 2) //* L2 - needs different logic - jumps to L2 logic
+  	    goto L2;
+
+          if(new_level < level)
+          {
+            lidx[new_level] = 0; //*Reset to 0.
+          }
+          if(new_level != level)
+          {
+            level = new_level; //* changes to new level
+	    if(lidx[level] >= NPROC) //* After switch, assume new queue reached the end of the queue, and needs to be reset.
+	      lidx[level] = lidx[level] % NPROC;
+            idx = &lidx[level];
+          }
+          //cprintf("Level: %d, Idx: %d\n", level, *idx);
+          if(L[level][*idx] == 0)
+            continue; // * empty cell - moves to next cell
 	  
-        if(L[level][*idx]->state != RUNNABLE)
-          continue; // * Not runnable process - moves to next cell
+          if(L[level][*idx]->state != RUNNABLE)
+            continue; // * Not runnable process - moves to next cell
 	  
-        p = L[level][*idx]; // *Assign current process.
-        c->proc = p;
-        switchuvm(p);
-        p->state = RUNNING;
+          p = L[level][*idx]; // *Assign current process.
+          c->proc = p;
+          switchuvm(p);
+          p->state = RUNNING;
 
-        //cprintf("[PID: %d] AT RUNNING STATE\n", p->pid);
+          //cprintf("[PID: %d] AT RUNNING STATE\n", p->pid);
 
-        swtch(&(c->scheduler), p->context);
-        switchkvm();
+          swtch(&(c->scheduler), p->context);
+          switchkvm();
 
-        //cprintf("[PID: %d] SWITCHED CONTEXT\n", p->pid);
-        c->proc = 0;
+          //cprintf("[PID: %d] SWITCHED CONTEXT\n", p->pid);
+          c->proc = 0;
+        }  
       }
-    //release(&ptable.lock);
-    }
-    else if(level == 2) // * L2 - Priority Queue based on process priority, FCFS for the same priority (Only executed if there are no runnable process in L0 and L1.)
-    {
+      else if(level == 2) // * L2 - Priority Queue based on process priority, FCFS for the same priority (Only executed if there are no runnable process in L0 and L1.)
+      {
 L2:
-      int tgt_idx = -1; // * target process index;
-      int priority = 1000; // * priority; initialized by the LOWEST value that can't be assigned to process.
-      int arrived = -1; // * arrived: initialized by -1. It is initialized there is no cap for arrived; it needs to be initialized by the first process.
-      int idx = 0; // * no need to memorize index for L2 -> search the whole L2 queue to find process every time.
+        int tgt_idx = -1; // * target process index;
+        int priority = 1000; // * priority; initialized by the LOWEST value that can't be assigned to process.
+        int arrived = -1; // * arrived: initialized by -1. It is initialized there is no cap for arrived; it needs to be initialized by the first process.
+        int idx = 0; // * no need to memorize index for L2 -> search the whole L2 queue to find process every time.
 
-      for(idx = 0; idx < NPROC; idx++)
-      { // * Find the highest priority with highest arrived value. 
-        if(L[2][idx] == 0)
-          continue; // * empty cell - moves to next cell
-        if(L[2][idx]->state != RUNNABLE) 
-	  continue; // * Not runnable process - moves to next cell
- 	if(L[2][idx]->priority > priority || (L[2][idx]->arrived > arrived && arrived != -1)) // if arrived haven't be initialized, than arrived will not be included in condition.
-	  continue; // * Lower Priority or comes late - moves to next cell
+        for(idx = 0; idx < NPROC; idx++)
+        { // * Find the highest priority with highest arrived value. 
+          if(L[2][idx] == 0)
+            continue; // * empty cell - moves to next cell
+          if(L[2][idx]->state != RUNNABLE) 
+	    continue; // * Not runnable process - moves to next cell
+ 	  if(L[2][idx]->priority > priority || (L[2][idx]->arrived > arrived && arrived != -1)) // if arrived haven't be initialized, than arrived will not be included in condition.
+	    continue; // * Lower Priority or comes late - moves to next cell
 	
-	// * FOUND IT
-	tgt_idx = idx;
-	priority = L[2][idx]->priority; // * Update Value - It must be higher than this priority
-	arrived = L[2][idx]->arrived; // * Update Value - It must arrive faster than this arrival time.
-      }
-      // * Execute the found process
-      if(tgt_idx != -1 && priority != 1000)
-      { // * Process Found: tgt_idx, priority must be updated for the targeting process
+	  // * FOUND IT
+	  tgt_idx = idx;
+	  priority = L[2][idx]->priority; // * Update Value - It must be higher than this priority
+	  arrived = L[2][idx]->arrived; // * Update Value - It must arrive faster than this arrival time.
+        }
+        // * Execute the found process
+        if(tgt_idx != -1 && priority != 1000)
+        { // * Process Found: tgt_idx, priority must be updated for the targeting process
 	
-	p = L[2][tgt_idx]; // *Assign current process.
-        c->proc = p;
-        switchuvm(p);
-        p->state = RUNNING;
+	  p = L[2][tgt_idx]; // *Assign current process.
+          c->proc = p;
+          switchuvm(p);
+          p->state = RUNNING;
 
-        //cprintf("[PID: %d] AT RUNNING STATE\n", p->pid);
+          //cprintf("[PID: %d] AT RUNNING STATE\n", p->pid);
 
-        swtch(&(c->scheduler), p->context);
-        switchkvm();
+          swtch(&(c->scheduler), p->context);
+          switchkvm();
 
-        //cprintf("[PID: %d] SWITCHED CONTEXT\n", p->pid);
-        c->proc = 0;
+          //cprintf("[PID: %d] SWITCHED CONTEXT\n", p->pid);
+          c->proc = 0;
+        }
       }
-    }
-    else //* ERROR
-    {
-      panic("MLFQ scheduler()");
+      else //* ERROR
+      {
+        panic("MLFQ scheduler()");
+      }
     }
     release(&ptable.lock);
   }
@@ -827,6 +944,11 @@ printmlfq(void)
   int level = 0;
   int idx = 0;
   cprintf("====================CURRENT MLFQ STATUS=====================\n");
+  if(lockedproc == 0)
+    cprintf("MLFQ STATE: UNLOCKED\n ");
+  else
+    cprintf("MLFQ STATE: LOCKED [PID: %d]\n", lockedproc->pid);
+
   cprintf("[PID] level / index / priority / (arrived: for L2)\n");
 
   for(level = 0; level < 3; level++)

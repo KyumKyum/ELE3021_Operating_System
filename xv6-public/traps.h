@@ -36,3 +36,5 @@
 #define IRQ_ERROR       19
 #define IRQ_SPURIOUS    31
 
+//* MLFQ Implement
+#define T_RSTGT		131    //* Reset Global Tick

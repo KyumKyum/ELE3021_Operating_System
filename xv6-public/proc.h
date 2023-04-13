@@ -36,6 +36,7 @@ struct context {
 };
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
+enum lockstate { LOCKED, UNLOCKED };
 
 // Per-process state
 //
@@ -58,6 +59,7 @@ struct proc {
   int idx;		       //* Index: Indicates its index in queue (L0 ~ L2);
   int priority;		       //* Priority: Used for priority scheduling in L2 <- Higher priority in minimal number.
   int tq;		       //* Time Quantum: tq for each process.
+  enum lockstate lock;	       //* Lock: check if current process calls schedulerLock / schedulerUnlock
   uint arrived;		       //* Arrived: arrived order of process. Value will be assigned if it comes to L2. Based on this value, scheduler will decide process to execute for the same priority
 };
 

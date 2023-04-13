@@ -40,20 +40,20 @@ setPriority(int pid, int priority)
 }*/
 
 //* schedulerLock()
-void 
+/*void 
 schedulerLock(int password)
 {
   cprintf("schedulerLock() called -> password: %d\n", password);
   return;
-}
+}*/
 
 //* schedulerUnlock()
-void 
+/*void 
 schedulerUnlock(int password)
 {
   cprintf("schedulerUnlock() called! - password: %d\n", password);
   return;
-}
+}*/
 
 
 //* Wrapper Function for current systemcall
@@ -116,9 +116,16 @@ sys_schedulerUnlock(void)
 //* ==================== SYSTEM CALL ====================
 
 int 
-rettq(int level) //* Return time quantum for each queue.
+rettq(struct proc *p) //* Return time quantum for each queue.
 {
-  return (2 * level) + 4;
+  if(p->lock == LOCKED)
+  { //*Locked process, gives 100 timequantum as max.
+    return 100;
+  }
+  else
+  {
+    return (2 * p->level) + 4;
+  }
 }
 
 
