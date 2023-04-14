@@ -332,6 +332,18 @@ wait(void)
         L[level][idx] = 0;
         //* Now, current cell is usuable for another new process.
         
+	//* Re-order: fill the blank space - assuring executing sequence.
+	/*int mov = 0;
+	for(mov = idx; mov < NPROC-1; mov++) // * If the last element became, empty, re-sort is not necessary.
+	{
+	  if(L[level][mov+1] == 0) 
+            break; // * If next element is empty, then current process was the last process.
+
+	   // * or, move the next element to current position.
+	   L[level][mov] = L[level][mov+1]; // * Move next element to current position [x][o] => [o][o]
+	   L[level][mov+1] = 0; // * Make the nexe element empty => [o][x]
+	}*/
+
 	cprintf("RELEASED PROCESS -> PID: %d / LEVEL: %d / INDEX: %d / PRIORITY: %d\n", p->pid, p->level, p->idx, p->priority);
 
 	pid = p->pid;
@@ -488,10 +500,14 @@ boostpriority(void)
       p->level = 0; //* Reset its level.
       p->idx = new_idx; //* Gives new index.
       p->priority = 3; //* Reset its priority.
+      p->arrived = 0; //* Reset its arrived
 
       new_idx++; //* Increase new_idx value.
     }
   }
+
+  //* Reset arrived counter
+  arrived = 0;
 }
 
 //* nullifylock() - nullify the lock, and relocate locked process to mlfq queue.
