@@ -625,8 +625,9 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
+   
   c->proc = 0;
-
+  
   for(;;){
     // Enable interrupts on this processor.
     sti();
@@ -636,10 +637,33 @@ scheduler(void)
     //* If scheduler is locked, MLFQ will not be in service.
     if(lockedproc != 0)
     { //* SCHEDULER LOCKED!
+      //* Check If current process is running state
+     if(lockedproc->state != RUNNING)
+      { //* If is not running but runnable, make it run again, schedule locked process.
+        if(lockedproc->state == RUNNABLE)
+	{
+	  lockedproc->state = RUNNING;
+	}
+	else //* for SLEEPING and ZOMBIE, nullify current lock (unlock), and go to normal scheduler.
+	{
+	  nullifylock();
+	  goto SCHEDULER;
+	}
+      }	      
+      
+      p = lockedproc;
+      c->proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
 
+      swtch(&(c->scheduler), p->context);
+      switchkvm();
+
+      c->proc = 0;
     }
     else
     {
+SCHEDULER:
       int level = retlevel(); //* Level of queue - Initialize, determine the level of queue after the loop is over
       //* MLFQ Rule:
         // L0: RR, Mostly Prioritized.

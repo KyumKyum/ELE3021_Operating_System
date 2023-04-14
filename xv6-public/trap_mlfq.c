@@ -173,24 +173,27 @@ trap(struct trapframe *tf)
   if(myproc() && myproc()->state == RUNNING &&
      tf->trapno == T_IRQ0+IRQ_TIMER)
   {
-    //cprintf("[TICK] %d\n",ticks);
     (myproc()->tq)--; //* Increase process tick.
     if(myproc()->tq <= 0) //*Time Quantum Expired
     { //* If allowed time quantum elapsed,
-      cprintf("Time Quantum for process %d had been expired!!(level %d, %d ticks)\n",myproc()->pid, myproc()->level, rettq(myproc()));
+      //* cprintf("Time Quantum for process %d had been expired!!(level %d, %d ticks)\n",myproc()->pid, myproc()->level, rettq(myproc()));
 
       //*L2: Time Qunatum Expired -> increase current priority; 
       if(myproc()->level == 2)
       {
         incpriority();
       }	
-      else //* Time Quantum Expired -> demote current process.
+      else if(myproc()->level == 1 || myproc()->level == 0) //* Time Quantum Expired -> demote current process.
       {
         demoteproc(); //* Definition: proc_mlfq.c
       }
-      yield();
+      else //* ERROR
+      {
+        panic("Time Quantum!\n");
+      }
+      //yield();
     }
-    //yield(); //* Changed yield code due to Piazza implementation direction https://piazza.com/class/lf0nppamy5p2hi/post/58
+    yield(); //* Changed yield code due to Piazza implementation direction https://piazza.com/class/lf0nppamy5p2hi/post/58
   }
 
   // Check if the process has been killed since we yielded
