@@ -8,7 +8,7 @@
 
 //* ==================== REQUIRED SYSTEM CALL ====================
 //* getLevel()
-int 
+/*int 
 getLevel(void)
 {
   if(myproc())
@@ -19,7 +19,7 @@ getLevel(void)
   else // * Error Case;
     return -1;
   return 0;
-}
+}*/
 
 //* setPriority()
 /*void 
@@ -57,6 +57,14 @@ schedulerUnlock(int password)
 
 
 //* Wrapper Function for current systemcall
+
+//* yield()
+int sys_yield (void)
+{
+  //cprintf("yield() called in proc.c\n");
+  yield();
+  return 0;
+}
 
 //* getLevel()
 int 
@@ -115,17 +123,17 @@ sys_schedulerUnlock(void)
 
 //* ==================== SYSTEM CALL ====================
 
-int 
-rettq(struct proc *p) //* Return time quantum for each queue.
+/*int 
+rettq(struct proc *p) // * Return time quantum for each queue.
 {
   if(p->lock == LOCKED)
-  { //*Locked process, gives 100 timequantum as max.
+  { // *Locked process, gives 100 timequantum as max.
     return 100;
   }
   else
   {
     return (2 * p->level) + 4;
   }
-}
+}*/
 
 

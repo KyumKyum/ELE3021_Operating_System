@@ -130,6 +130,7 @@ void		incpriority(void);
 void		boostpriority(void);
 struct proc*    getproc(int pid);
 void		nullifylock(void);
+struct proc* 	getlockedproc(void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

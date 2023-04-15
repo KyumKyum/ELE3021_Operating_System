@@ -392,7 +392,21 @@ wait(void)
 
 //* ELE3021 - Project #1: Make MLFQ Scheduler
 
-//retlevel: return level of queue has RUNNABLE process
+//* rettq: return time quantum for process
+int
+rettq(struct proc *p) //* Return time quantum for each queue.
+{
+  if(p->lock == LOCKED)
+  { //*Locked process, gives 100 timequantum as max.
+    return 100;
+  }
+  else
+  {
+    return (2 * p->level) + 4;
+  }
+}
+
+//* retlevel: return level of queue has RUNNABLE process
 int
 retlevel(void)
 { //* Return level of queue for next process
@@ -546,6 +560,19 @@ nullifylock(void)
   return;
 }
 
+//* getLevel()
+int
+getLevel(void)
+{
+  if(myproc())
+  {
+    //cprintf("Current Process Level: %d\n", myproc()->level);
+    return myproc()->level; // * Return current process level.
+  }
+  else // * Error Case;
+    return -1;
+  return 0;
+}
 
 //* setPriority(): set current process priority.
 void
@@ -562,7 +589,7 @@ setPriority(int pid, int priority)
     else
     {
       p->priority = priority; //* Update Priority
-      cprintf("Priority Set: Pid: %d, Priority: %d\n", p->pid, p->priority);
+      //cprintf("Priority Set: Pid: %d, Priority: %d\n", p->pid, p->priority);
       break;
     }
   }
@@ -649,8 +676,10 @@ scheduler(void)
 	  nullifylock();
 	  goto SCHEDULER;
 	}
-      }	      
-      
+      }
+      //* Context Switching
+      //* It could be a overhead (same process switching)
+      //* but it is not preferred to change yield() and sched() function IOT resolve current overhead.      
       p = lockedproc;
       c->proc = p;
       switchuvm(p);
@@ -695,7 +724,6 @@ SCHEDULER:
 	      lidx[level] = lidx[level] % NPROC;
             idx = &lidx[level];
           }
-          //cprintf("Level: %d, Idx: %d\n", level, *idx);
           if(L[level][*idx] == 0)
             continue; // * empty cell - moves to next cell
 	  
@@ -706,18 +734,14 @@ SCHEDULER:
           c->proc = p;
           switchuvm(p);
           p->state = RUNNING;
-
-          //cprintf("[PID: %d] AT RUNNING STATE\n", p->pid);
-
           swtch(&(c->scheduler), p->context);
           switchkvm();
 
-          //cprintf("[PID: %d] SWITCHED CONTEXT\n", p->pid);
           c->proc = 0;
         }  
       }
-      else if(level == 2) // * L2 - Priority Queue based on process priority, FCFS for the same priority (Only executed if there are no runnable process in L0 and L1.)
-      {
+      else if(level == 2) 
+      {  // * L2 - Priority Queue based on process priority, FCFS for the same priority (Only executed if there are no runnable process in L0 and L1.)
 L2:
         int tgt_idx = -1; // * target process index;
         int priority = 1000; // * priority; initialized by the LOWEST value that can't be assigned to process.
@@ -730,7 +754,8 @@ L2:
             continue; // * empty cell - moves to next cell
           if(L[2][idx]->state != RUNNABLE) 
 	    continue; // * Not runnable process - moves to next cell
- 	  if(L[2][idx]->priority > priority || (L[2][idx]->arrived > arrived && arrived != -1)) // if arrived haven't be initialized, than arrived will not be included in condition.
+ 	  if(L[2][idx]->priority > priority 
+	      || (L[2][idx]->arrived > arrived && arrived != -1)) // if arrived haven't be initialized, than arrived will not be included in condition.
 	    continue; // * Lower Priority or comes late - moves to next cell
 	
 	  // * FOUND IT
@@ -746,13 +771,9 @@ L2:
           c->proc = p;
           switchuvm(p);
           p->state = RUNNING;
-
-          //cprintf("[PID: %d] AT RUNNING STATE\n", p->pid);
-
           swtch(&(c->scheduler), p->context);
           switchkvm();
 
-          //cprintf("[PID: %d] SWITCHED CONTEXT\n", p->pid);
           c->proc = 0;
         }
       }
@@ -801,13 +822,20 @@ yield(void)
   release(&ptable.lock);
 }
 
+//* getlockedproc() - check if there is process calls lock.
+struct proc*
+getlockedproc()
+{
+  return lockedproc;
+}
+
 //* Create Wrapper Function for yield()
-int sys_yield (void)
+/*int sys_yield (void)
 {
   cprintf("yield() called in proc.c\n");
   yield();
   return 0;
-}
+}*/
 
 // A fork child's very first scheduling by scheduler()
 // will swtch here.  "Return" to user space.
