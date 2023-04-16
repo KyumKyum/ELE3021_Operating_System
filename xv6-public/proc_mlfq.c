@@ -117,7 +117,7 @@ allocproc(void)
      L[0][idx] = p; //* Assign current process to index - Scheduled in L0 initially.
      p->idx = idx; //* Assign Index - current position
      p->tq = 4; //* Assign Time Qunatum - Level 0 - 4 ticks
-     cprintf("Allocated Process: %s // PID: %d, Allocated in L0[%d]\n", p->name, p->pid, idx); //* Debug: Comment this line if it is not required.
+     //cprintf("Allocated Process: %s // PID: %d, Allocated in L0[%d]\n", p->name, p->pid, idx); //* Debug: Comment this line if it is not required.
      break;
    }
  }
@@ -331,20 +331,7 @@ wait(void)
         int idx = p->idx;
         L[level][idx] = 0;
         //* Now, current cell is usuable for another new process.
-        
-	//* Re-order: fill the blank space - assuring executing sequence.
-	/*int mov = 0;
-	for(mov = idx; mov < NPROC-1; mov++) // * If the last element became, empty, re-sort is not necessary.
-	{
-	  if(L[level][mov+1] == 0) 
-            break; // * If next element is empty, then current process was the last process.
-
-	   // * or, move the next element to current position.
-	   L[level][mov] = L[level][mov+1]; // * Move next element to current position [x][o] => [o][o]
-	   L[level][mov+1] = 0; // * Make the nexe element empty => [o][x]
-	}*/
-
-	cprintf("RELEASED PROCESS -> PID: %d / LEVEL: %d / INDEX: %d / PRIORITY: %d\n", p->pid, p->level, p->idx, p->priority);
+	//cprintf("RELEASED PROCESS -> PID: %d / LEVEL: %d / INDEX: %d / PRIORITY: %d\n", p->pid, p->level, p->idx, p->priority);
 
 	pid = p->pid;
         kfree(p->kstack);
@@ -415,6 +402,9 @@ retlevel(void)
   int level = 0;
   int idx = 0;
 
+  if(lockedproc != 0)
+    return -1; //* some process called schedulerLock(); Stop MLFQ scheduling and schedule lockedproc.
+
   for(level = 0; level < MLFQ_LEV; level++)
   {
     if(level == 2){
@@ -456,7 +446,8 @@ demoteproc(void)
 	if(new_level == 2) //* If new level is L2, gives new arrived value.
 	  myproc()->arrived = arrived++;
 
-	cprintf("Demoted Process: %s // PID: %d, Allocated in L%d[%d]\n", myproc()->name, myproc()->pid , myproc()->level, idx); //* Debug: Comment this line if it is not required.
+	//cprintf("Demoted Process: %s // PID: %d, Allocated in L%d[%d]\n", myproc()->name, myproc()->pid , myproc()->level, idx); 
+	// * Debug: Comment this line if it is not required.
       	break; //* Exit Loop
       }
 
@@ -479,7 +470,8 @@ incpriority(void)
   if(myproc()-> priority > 0)
     (myproc()->priority)--; //* Increase current priority;
 
-  cprintf("Increased Priority // PID: %d, Priority became %d\n", myproc()->pid, myproc()->priority); //* Debug: Comment this line if it is not required.
+  //cprintf("Increased Priority // PID: %d, Priority became %d\n", myproc()->pid, myproc()->priority);
+  //* Debug: Comment this line if it is not required.
 
   return;
 }
@@ -488,6 +480,7 @@ incpriority(void)
 void
 boostpriority(void)
 { //* Boost the whole priority if global tick became 100.
+  //cprintf("PRIORITY BOOSTING!!!\n");
   struct proc* p;
   int level = 0;
   int idx = 0;
@@ -525,7 +518,6 @@ boostpriority(void)
 }
 
 //* nullifylock() - nullify the lock, and relocate locked process to mlfq queue.
-
 void
 nullifylock(void)
 {
@@ -578,6 +570,9 @@ getLevel(void)
 void
 setPriority(int pid, int priority)
 {
+  if(priority < 0 || priority > 3) //* Error Case: wrong priority value
+    return;
+
   struct proc *p;
 
   acquire(&ptable.lock);
@@ -663,6 +658,7 @@ scheduler(void)
     
     //* If scheduler is locked, MLFQ will not be in service.
     if(lockedproc != 0)
+LOCKED:
     { //* SCHEDULER LOCKED!
       //* Check If current process is running state
      if(lockedproc->state != RUNNING)
@@ -698,7 +694,6 @@ SCHEDULER:
         // L0: RR, Mostly Prioritized.
         // L1: RR
         // L2: Priority Scheduling based on process->priority, FCFS for the same priority level.
-    
       if(level < 2) //* L0, L1 - RR
       {
         int *idx = &lidx[level]; // * Index for Queue.
@@ -710,6 +705,9 @@ SCHEDULER:
 
           int new_level = retlevel();
 	  //*Check if level is different; if new level is smaller(priortized) than current level, the index must be reset to 0.
+	  if(new_level == -1) //* Scheduler Locked: jumps to schedulerLock logic.
+	    goto LOCKED;
+	  
 	  if(new_level == 2) //* L2 - needs different logic - jumps to L2 logic
   	    goto L2;
 
@@ -717,6 +715,7 @@ SCHEDULER:
           {
             lidx[new_level] = 0; //*Reset to 0.
           }
+
           if(new_level != level)
           {
             level = new_level; //* changes to new level
@@ -724,10 +723,11 @@ SCHEDULER:
 	      lidx[level] = lidx[level] % NPROC;
             idx = &lidx[level];
           }
+
           if(L[level][*idx] == 0)
             continue; // * empty cell - moves to next cell
-	  
-          if(L[level][*idx]->state != RUNNABLE)
+          
+	  if(L[level][*idx]->state != RUNNABLE)
             continue; // * Not runnable process - moves to next cell
 	  
           p = L[level][*idx]; // *Assign current process.
@@ -736,7 +736,6 @@ SCHEDULER:
           p->state = RUNNING;
           swtch(&(c->scheduler), p->context);
           switchkvm();
-
           c->proc = 0;
         }  
       }
@@ -821,21 +820,6 @@ yield(void)
   sched();
   release(&ptable.lock);
 }
-
-//* getlockedproc() - check if there is process calls lock.
-struct proc*
-getlockedproc()
-{
-  return lockedproc;
-}
-
-//* Create Wrapper Function for yield()
-/*int sys_yield (void)
-{
-  cprintf("yield() called in proc.c\n");
-  yield();
-  return 0;
-}*/
 
 // A fork child's very first scheduling by scheduler()
 // will swtch here.  "Return" to user space.
@@ -997,13 +981,6 @@ printproc(void)
   }
 }
 
-int sys_printproc(void)
-{
-  printproc();
-  exit();
-  return 0;
-}
-
 //* Print all process based on MLFQ. (Prints all process in MLFQ based on its level.)
 void 
 printmlfq(void)
@@ -1043,9 +1020,3 @@ printmlfq(void)
   }
 }
 
-int sys_printmlfq(void)
-{
-  printmlfq();
-  exit();
-  return 0;
-}

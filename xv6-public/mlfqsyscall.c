@@ -4,64 +4,12 @@
 #include "param.h" //* NCPU, NOFILE def in proc.h
 #include "proc.h"
 
-//* Syscall for mlfq
-
-//* ==================== REQUIRED SYSTEM CALL ====================
-//* getLevel()
-/*int 
-getLevel(void)
-{
-  if(myproc())
-  {
-    cprintf("Current Process Level: %d\n", myproc()->level);
-    return myproc()->level; // * Return current process level.
-  }
-  else // * Error Case;
-    return -1;
-  return 0;
-}*/
-
-//* setPriority()
-/*void 
-setPriority(int pid, int priority)
-{
-  //cprintf("setPriority() called, pid: %d, priority: %d\n", pid, priority);
-  struct proc* p = getproc(pid);
-
-  if(p->pid == -1) // * There are no such process
-  {
-    cprintf("setPriority(): There are no such process having pid %d.\n", pid);
-  }
-  else
-  {
-    cprintf("FOUNDED: Pid - %d\n", p->pid);
-  }
-  return;
-}*/
-
-//* schedulerLock()
-/*void 
-schedulerLock(int password)
-{
-  cprintf("schedulerLock() called -> password: %d\n", password);
-  return;
-}*/
-
-//* schedulerUnlock()
-/*void 
-schedulerUnlock(int password)
-{
-  cprintf("schedulerUnlock() called! - password: %d\n", password);
-  return;
-}*/
-
-
 //* Wrapper Function for current systemcall
 
 //* yield()
 int sys_yield (void)
 {
-  //cprintf("yield() called in proc.c\n");
+  cprintf("yield() called in proc.c\n");
   yield();
   return 0;
 }
@@ -121,19 +69,20 @@ sys_schedulerUnlock(void)
   return 0;
 }
 
-//* ==================== SYSTEM CALL ====================
-
-/*int 
-rettq(struct proc *p) // * Return time quantum for each queue.
+//* printmlfq()
+int sys_printmlfq(void)
 {
-  if(p->lock == LOCKED)
-  { // *Locked process, gives 100 timequantum as max.
-    return 100;
-  }
-  else
-  {
-    return (2 * p->level) + 4;
-  }
-}*/
+  printmlfq();
+  exit();
+  return 0;
+}
+
+//* printproc()
+int sys_printproc(void)
+{
+  printproc();
+  exit();
+  return 0;
+}
 
 
