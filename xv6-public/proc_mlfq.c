@@ -605,8 +605,9 @@ schedulerLock(int password)
   else if(password != LOCK_PW)
   {//* REJECT: Password didn't match
    cprintf("REJECT: Password incorrect, forcing to stop current process...\n");
-   cprintf("[REJECTED PROCESS] Pid: %d / Time Quantum: %d / Level: %d\n", myproc()->pid, (2* myproc()->level)+4, myproc()->level);
-   kill(myproc()->pid);
+   cprintf("[REJECTED PROCESS] Pid: %d / Elapsed Time Quantum: %d / Level: %d\n",
+		   myproc()->pid, myproc()->lock == LOCKED ? 100 - myproc()->tq : ((2* myproc()->level)+4)-myproc()->tq, myproc()->level);
+   kill(myproc()->pid); 
   }
   else
   { //* Lock scheduler.
@@ -620,7 +621,7 @@ schedulerLock(int password)
   return;
 }
 
-//( schedulerUnlock(): unlock scheduler, return current process to MLFQ.
+//* ( schedulerUnlock(): unlock scheduler, return current process to MLFQ.
 void
 schedulerUnlock(int password)
 {
@@ -630,7 +631,8 @@ schedulerUnlock(int password)
   }else if(password != LOCK_PW)
   { //* REJECT: Password didn't match
     cprintf("REJECT: Password incorrect, forcing to stop current process...\n");
-    cprintf("[REJECTED PROCESS] PID: %d / Time Qunatum: %d / Level: %d\n", myproc()->pid, (2*myproc()->level)+4, myproc()->level);
+    cprintf("[REJECTED PROCESS] PID: %d / Elapsed  Time Qunatum: %d / Level: %d\n",
+		    myproc()->pid, myproc()->lock == LOCKED ? 100 - myproc()->tq :  ((2*myproc()->level)+4)-myproc()->tq, myproc()->level);
     kill(myproc()->pid);
   }
   else 

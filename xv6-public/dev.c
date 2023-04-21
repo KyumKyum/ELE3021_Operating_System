@@ -69,7 +69,7 @@ void exit_children()
 
 int main(int argc, char *argv[])
 {
-  int i, pid;
+   int i, pid;
   int count[MAX_LEVEL] = {0};
 //  int child;
 
