@@ -188,5 +188,10 @@ int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
 
 
+//* Implementation for Project #2
+
+// exec2.c
+int             exec2(char*, char**, int);
+
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

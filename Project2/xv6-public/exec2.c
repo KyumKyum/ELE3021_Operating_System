@@ -7,8 +7,9 @@
 #include "x86.h"
 #include "elf.h"
 
+//* exec2: Process Execution with various stacksize
 int
-exec(char *path, char **argv)
+exec2(char *path, char **argv, int stacksize)
 {
   char *s, *last;
   int i, off;
@@ -21,9 +22,16 @@ exec(char *path, char **argv)
 
   begin_op();
 
+  //* Check Stack Size
+  if(stacksize < 1 || stacksize > 100){
+    end_op();//* If stacksize is not valid, end current operation (Invalid Call)
+    cprintf("exec2: invalid stack size");
+    return -1;
+  }
+
   if((ip = namei(path)) == 0){
     end_op();
-    cprintf("exec: fail\n");
+    cprintf("exec2: fail\n");
     return -1;
   }
   ilock(ip);
@@ -59,12 +67,15 @@ exec(char *path, char **argv)
   iunlockput(ip);
   end_op();
   ip = 0;
+
   // Allocate two pages at the next page boundary.
   // Make the first inaccessible.  Use the second as the user stack.
   sz = PGROUNDUP(sz);
-  if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE)) == 0)
+
+  //* exec2: allocate stack size, 1 guard page. (stacksize + 1)
+  if((sz = allocuvm(pgdir, sz, sz + (stacksize + 1)*PGSIZE)) == 0)
     goto bad;
-  clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
+  clearpteu(pgdir, (char*)(sz - (stacksize + 1)*PGSIZE));
   sp = sz;
 
   // Push argument strings, prepare rest of stack in ustack.
@@ -100,6 +111,8 @@ exec(char *path, char **argv)
   curproc->tf->esp = sp;
   switchuvm(curproc);
   freevm(oldpgdir);
+
+  cprintf("Allocated: %d Stacksize + 1 Guard Page\n", stacksize);
   return 0;
 
  bad:
