@@ -10,12 +10,17 @@ main(){
 
   while(recv_cmd(buf, sizeof(buf)) >= 0){
 
-    if(run_cmd(parse_cmd(buf), buf) < 0){ //* Error Occured
+    int res = run_cmd(parse_cmd(buf), buf);
+
+    if (res < 0) //* Error Occured
       goto err; 
-    }
+    else if(res == 1)
+      goto exit;
   }
 
-  return 0;
+exit:
+  printf(0, "Exiting Pmanager... Bye~\n");
+  exit();
 
 err: //* Error Handling
   printf(0, "Pmanager: Unexpected Error Occured while executing command \"%s\", shutting down pmanager.\n", buf);
@@ -66,6 +71,18 @@ char arg[BUF_SIZE]; //* String For Argument Parsing
       }
       break;
 
+    case EXEC:
+      //* TODO
+      break;
+
+    case MEMLIM:
+      //* TODO
+      break;
+
+    case EXIT: //* exit
+      return 1;
+      break;
+
     default: //* No such command
       printf(0, "Pmanager: Unknown Command \"%s\" \n", buf);
   }
@@ -75,13 +92,23 @@ char arg[BUF_SIZE]; //* String For Argument Parsing
 
 int
 parse_cmd(char* cmd){
-  if(cmd[0] == 'l' && cmd[1] == 'i' && cmd[2] == 's' && cmd[3] == 't'){
+  if(cmd[0] == 'l' && cmd[1] == 'i' && cmd[2] == 's' && cmd[3] == 't' && (cmd[4] == 0 || cmd[4] == ' ')){
     return LIST; //* Current command is list command.
   }
-  else if(cmd[0] == 'k' && cmd[1] == 'i' && cmd[2] == 'l' && cmd[3] == 'l'){
+  else if(cmd[0] == 'k' && cmd[1] == 'i' && cmd[2] == 'l' && cmd[3] == 'l' && cmd[4] == ' '){
     return KILL; // Current command is kill command
   }
-
+  else if(cmd[0] == 'e' && cmd[1] == 'x' && cmd[2] == 'e' && cmd[3] == 'c' 
+		  && cmd[4] == 'u' && cmd[5] == 't' && cmd[6] == 'e' && cmd[7] == ' '){
+    return EXEC; // Current command is execute command
+  }
+  else if(cmd[0] == 'm' && cmd[1] == 'e' && cmd[2] == 'm' && cmd[3] == 'l' 
+		  && cmd[4] == 'i' && cmd[5] == 'm' && cmd[6] == ' '){
+    return MEMLIM; // Current command is memlim command
+  }
+  else if(cmd[0] == 'e' && cmd[1] == 'x' && cmd[2] == 'i' && cmd[3] == 't' && (cmd[4] == 0 || cmd[4] == ' ')){
+    return EXIT; // Current command is exit command
+  }
   return -1;
 }
 
