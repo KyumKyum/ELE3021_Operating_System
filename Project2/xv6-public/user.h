@@ -26,6 +26,7 @@ int uptime(void);
 void yield(void);
 //*Project #2
 int list(void);
+int kill(int);
 
 // ulib.c
 int stat(const char*, struct stat*);

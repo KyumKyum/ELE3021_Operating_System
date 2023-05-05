@@ -9,7 +9,8 @@
 #define BUF_SIZE 100
 
 //* Function Prototypes
-int recv_cmd(char*, int);
-int run_cmd(int, char*);
-int parse_cmd(char*);
-char* null_terminate(char*, int);
+int recv_cmd(char*, int); //* receive command from user
+int run_cmd(int, char*); //* run current command
+int parse_cmd(char*); //* parse command, make it recognizable to pmanager.
+char* null_eliminate(char*, int); //* eliminate null at the end of the command.
+char* find_argument(char*, char*, int); //* return argument in the index.
