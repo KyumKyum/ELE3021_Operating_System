@@ -24,6 +24,8 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 void yield(void);
+//*Project #2
+int list(void);
 
 // ulib.c
 int stat(const char*, struct stat*);

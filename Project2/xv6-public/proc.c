@@ -540,3 +540,23 @@ procdump(void)
     cprintf("\n");
   }
 }
+
+//* Project #2
+//
+//* list: list all current process running
+int
+list(){
+  struct proc *p;
+
+  cprintf("[PID] name / number of stack page / allocated memory (byte)/ memory limit (byte) \n");
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->state == UNUSED) //* skip the unused space.
+      continue;
+
+    cprintf("[%d] / %s / %d stacks / %d bytes allocated / ", p->pid, p->name, p->stacksize, p->sz);
+    p->memlim == 0 ? cprintf(" UNLIMITED \n") : cprintf(" %d byte(s) \n", p->memlim); //* memlim will be 0 if there is no memeory limitation.
+
+  }
+
+  return 0;
+}

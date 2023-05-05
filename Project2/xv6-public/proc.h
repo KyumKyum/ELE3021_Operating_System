@@ -36,8 +36,6 @@ struct context {
 };
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
-enum lockstate { LOCKED, UNLOCKED };
-
 // Per-process state
 //
 //* New Process Structure: Process dedicated for MLFQ scheduling
@@ -55,12 +53,8 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
-  int level;		       //* Queue Level: Show Current Process Level ( 0 - 2 );
-  int idx;		       //* Index: Indicates its index in queue (L0 ~ L2);
-  int priority;		       //* Priority: Used for priority scheduling in L2 <- Higher priority in minimal number.
-  int tq;		       //* Time Quantum: tq for each process.
-  enum lockstate lock;	       //* Lock: check if current process calls schedulerLock / schedulerUnlock
-  uint arrived;		       //* Arrived: arrived order of process. Value will be assigned if it comes to L2.
+  int stacksize;	       //* Allocated Stack Page Size
+  int memlim; 		       //* Memory Limit (Unlimited if 0 assigned)
 };
 
 // Process memory is laid out contiguously, low addresses first:

@@ -1,4 +1,4 @@
-#Project 2 Implementation: exec2.o
+#Project 2 Implementation: exec2.o, wrapper.o
 
 OBJS = \
 	bio.o\
@@ -30,6 +30,7 @@ OBJS = \
 	uart.o\
 	vectors.o\
 	vm.o\
+	wrapper.o\
 
 # Cross-compiling (e.g., on Mac OS X)
 # TOOLPREFIX = i386-jos-elf
@@ -184,6 +185,7 @@ UPROGS=\
 	_wc\
 	_zombie\
 	_dev\
+	_pmanager\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)
@@ -253,7 +255,7 @@ qemu-nox-gdb: fs.img xv6.img .gdbinit
 EXTRA=\
 	mkfs.c ulib.c user.h cat.c echo.c forktest.c grep.c kill.c\
 	ln.c ls.c mkdir.c rm.c stressfs.c wc.c zombie.c\
-	printf.c umalloc.c dev.c\
+	printf.c umalloc.c dev.c pmanager.c\
 	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list\
 	.gdbinit.tmpl gdbutil\
 
