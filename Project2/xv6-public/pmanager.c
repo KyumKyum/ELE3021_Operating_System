@@ -45,7 +45,7 @@ recv_cmd(char *buf, int buf_size){
 
 int
 run_cmd(int cmd, char *buf){
-char arg[BUF_SIZE]; //* String For Argument Parsing
+char* argv[MAX_ARGV]; //* String For Argument Parsing
 
   switch(cmd){
     case LIST: //* list
@@ -55,7 +55,9 @@ char arg[BUF_SIZE]; //* String For Argument Parsing
       break;
 
     case KILL: //* kill
-      int pid = atoi(find_argument(buf, arg, 1));
+      parse_argument(buf, argv, BUF_SIZE);
+
+      int pid = atoi(argv[0]);
       
       if(pid <= 0){ //* Invalid pid
         printf(0, "Invalid Pid. Pid must be integer bigger than 0\n");
@@ -72,7 +74,11 @@ char arg[BUF_SIZE]; //* String For Argument Parsing
       break;
 
     case EXEC:
-      //* TODO
+      //* Execute
+      //char **argv[10]; //* Maximum 10 arguments.
+      //for(int i = 0; i < 10; i++){
+      //  find_argument(buf, arg, i+1);
+      //}
       break;
 
     case MEMLIM:
@@ -95,7 +101,7 @@ parse_cmd(char* cmd){
   if(cmd[0] == 'l' && cmd[1] == 'i' && cmd[2] == 's' && cmd[3] == 't' && (cmd[4] == 0 || cmd[4] == ' ')){
     return LIST; //* Current command is list command.
   }
-  else if(cmd[0] == 'k' && cmd[1] == 'i' && cmd[2] == 'l' && cmd[3] == 'l' && cmd[4] == ' '){
+  else if(cmd[0] == 'k' && cmd[1] == 'i' && cmd[2] == 'l' && cmd[3] == 'l' && (cmd[4] == ' ' || cmd[4] == 0)){
     return KILL; // Current command is kill command
   }
   else if(cmd[0] == 'e' && cmd[1] == 'x' && cmd[2] == 'e' && cmd[3] == 'c' 
@@ -113,37 +119,81 @@ parse_cmd(char* cmd){
 }
 
 char* null_eliminate(char* cmd, int buf_size){
-  for(int i = 0; i < buf_size; i++){
-    if(cmd[i] == '\n'){ //* Eleminate this and return cmd.
+  int start = 0;
+  int mv = 0;
+  int idx = 0;
+  //* Eliminate meaningless whitespaces infront of command.
+     
+  while(idx < buf_size){
+    if(cmd[idx] == ' '){ //* meaningless white space
+      start++;
+      idx++;
+      continue;
+    }
+
+    if(start == 0) //* no need to eliminate
+      break;
+
+    //* Eliminate all commands
+    for(int j = start; j < buf_size; j++){
+      cmd[mv] = cmd[j]; //* move command;
+      cmd[j] = 0;
+
+      if(cmd[mv] == '\n') //* moved all command; break.
+        break;
+
+      mv++;
+    }
+
+    break; //* Move Complete
+  }
+  
+  /*for(int i = 0; i < buf_size; i++){
+    if(cmd[i] == '\n'){ // * Eleminate this and return cmd.
       cmd[i] = 0;
     }
-  }
+  }*/
 
   return cmd;
 }
 
-char* find_argument(char* cmd, char* arg, int idx){
-  int tgt = 0; //* Target Argument
-  int argidx = 0; //* Argument index
+char** parse_argument(char* cmd, char** argv, int buf_size){
+  int argvsz = 0; //* argument size
+  int start = 0; //* Argument starts
+  int argvnum = 0;//* number of arguments
 
- for(int i = 0; i < BUF_SIZE; i++){
-   if(cmd[i] != ' ') 
-     continue;
-
-   //* Whitespace found: check if current arguemt is sth we found
-   if(++tgt != idx)
-     continue; //* Not an argument we are targeting.
-
-  //* Argument Found
-  for(int ch = i+1; ch < BUF_SIZE; ch++){
-    //* Copy argument until there is an whitespace.
-    if(cmd[ch] == ' '){ //* Whitespace found: end of current argument
-      return arg; //* Return Argument
+  //* Find argument starting place.
+  while(start < buf_size){
+    if(cmd[start++] != ' '){ // * skip the command part
+      continue;
     }
 
-    arg[argidx++] = cmd[ch]; //* Copy current character.
-  } 
- }
+    // * next part will be starting point of argument
+    break; // * starting position found.
+  }
 
-return arg; 
+
+  for(int i = start; i < buf_size; i++){
+    if(cmd[i] != ' ' && cmd[i] != '\n'){ //* Argument
+      argvsz++;
+      continue;
+    }
+    //* Whitespace found: End of argument.
+    if(argvsz == 0) //* no argument size: skip.
+      continue;
+
+    argv[argvnum] = malloc(argvsz);
+    for(int tgt = 0; tgt < argvsz; tgt++){
+      argv[argvnum][tgt] = cmd[start + tgt];
+    }
+
+    if(cmd[i] == '\n') //* if current position is 0, it is endpoint. 
+      break;
+
+    argvsz = 0;
+    argvnum++;
+    start = i+1; //* start from next pos
+  }
+
+  return argv; 
 } 
