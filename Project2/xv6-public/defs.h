@@ -195,6 +195,7 @@ int             exec2(char*, char**, int);
 
 //*proc.c
 int		list();
+int		setmemorylimit();
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

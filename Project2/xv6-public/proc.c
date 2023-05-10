@@ -112,6 +112,9 @@ found:
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
 
+  //* Allocated stacksize and memory limit (Default)
+  p->stacksize = 1;
+  p->memlim = 0;
   return p;
 }
 
@@ -162,6 +165,13 @@ growproc(int n)
   struct proc *curproc = myproc();
 
   sz = curproc->sz;
+
+  //* Check memory limit
+  if(curproc->memlim != 0 && sz + n > curproc->memlim) { //* Memory limit exists, but current process grows more than its limitation.
+    cprintf("FATAL ERROR: Out of memory - allocated more than its limitation.\n");
+    return -1;
+  }
+
   if(n > 0){
     if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0)
       return -1;
@@ -548,7 +558,9 @@ int
 list(){
   struct proc *p;
 
-  cprintf("[PID] name / number of stack page / allocated memory (byte)/ memory limit (byte) \n");
+  cprintf("-------------------------------------------------------------------------------------\n");
+  cprintf("| [PID] name / number of stack page / allocated memory (byte) / memory limit (byte) |\n");
+  cprintf("-------------------------------------------------------------------------------------\n");
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->state == UNUSED) //* skip the unused space.
       continue;
@@ -559,4 +571,39 @@ list(){
   }
 
   return 0;
+}
+
+//* setmemorylimit: set memory limit for process.
+int
+setmemorylimit(int pid, int limit){
+ struct proc *p;
+
+ for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+   if(p->pid != pid)
+     continue;
+
+   //* Process Found
+   break;
+ }
+
+ if(limit < p->sz) //* Requested limit is less than size.
+   return -1; 
+
+ //* Limit Allocation
+ p->memlim = limit; 
+ //* This limitation will be enforced in growproc();
+
+ return 0;
+}
+
+int
+sys_setmemorylimit(void){
+  int pid, lim;
+  if(argint(0, &pid) < 0)
+    return -1;
+
+  if(argint(1, &lim) < 0)
+    return -1;
+
+  return setmemorylimit(pid, lim);
 }

@@ -25,7 +25,7 @@ exec2(char *path, char **argv, int stacksize)
   //* Check Stack Size
   if(stacksize < 1 || stacksize > 100){
     end_op();//* If stacksize is not valid, end current operation (Invalid Call)
-    cprintf("exec2: invalid stack size");
+    cprintf("exec2: invalid stack size\n");
     return -1;
   }
 
@@ -82,6 +82,8 @@ exec2(char *path, char **argv, int stacksize)
   curproc->stacksize = stacksize;
   curproc->memlim = 0;
 
+  cprintf("Allocated stacksize: %d\n", curproc->stacksize);
+
   // Push argument strings, prepare rest of stack in ustack.
   for(argc = 0; argv[argc]; argc++) {
     if(argc >= MAXARG)
@@ -116,7 +118,7 @@ exec2(char *path, char **argv, int stacksize)
   switchuvm(curproc);
   freevm(oldpgdir);
 
-  cprintf("Allocated: %d Stacksize + 1 Guard Page\n", stacksize);
+  //cprintf("Allocated: %d Stacksize + 1 Guard Page\n", stacksize);
   return 0;
 
  bad:
@@ -127,4 +129,32 @@ exec2(char *path, char **argv, int stacksize)
     end_op();
   }
   return -1;
+}
+
+
+int
+sys_exec2(void)
+{
+  char *path, *argv[MAXARG];
+  int stacksize;
+  int i;
+  uint uargv, uarg;
+
+  if(argstr(0, &path) < 0 || argint(1, (int*)&uargv) < 0 || argint(2, &stacksize) < 0){
+    return -1;
+  }
+  memset(argv, 0, sizeof(argv));
+  for(i=0;; i++){
+    if(i >= NELEM(argv))
+      return -1;
+    if(fetchint(uargv+4*i, (int*)&uarg) < 0)
+      return -1;
+    if(uarg == 0){
+      argv[i] = 0;
+      break;
+    }
+    if(fetchstr(uarg, &argv[i]) < 0)
+      return -1;
+  }
+  return exec2(path, argv, stacksize);
 }

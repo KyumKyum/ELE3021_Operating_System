@@ -21,4 +21,6 @@
 #define SYS_mkdir  20
 #define SYS_close  21
 #define SYS_yield  22
-#define SYS_list   23
+#define SYS_exec2  24
+#define SYS_list   25
+#define SYS_setmemorylimit 26

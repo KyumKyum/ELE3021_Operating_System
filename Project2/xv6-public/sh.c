@@ -64,6 +64,7 @@ runcmd(struct cmd *cmd)
   struct pipecmd *pcmd;
   struct redircmd *rcmd;
 
+
   if(cmd == 0)
     exit();
 
