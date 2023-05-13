@@ -197,5 +197,7 @@ int             exec2(char*, char**, int);
 int		list();
 int		setmemorylimit();
 
+//*Threads
+//* int thread_create(thread_t*, void*(*start_routine)(void*), void*);
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

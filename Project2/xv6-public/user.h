@@ -24,7 +24,8 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 void yield(void);
-//*Project #2
+
+//* Project #2
 int list(void);
 int exec2(char*, char**, int);
 int kill(int);

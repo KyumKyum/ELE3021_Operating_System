@@ -1,4 +1,4 @@
-#Project 2 Implementation: exec2.o, wrapper.o
+#Project 2 Implementation: exec2.o, wrapper.o thread.o
 
 OBJS = \
 	bio.o\
@@ -31,6 +31,7 @@ OBJS = \
 	vectors.o\
 	vm.o\
 	wrapper.o\
+	thread.o\
 
 # Cross-compiling (e.g., on Mac OS X)
 # TOOLPREFIX = i386-jos-elf

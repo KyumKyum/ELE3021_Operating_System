@@ -24,3 +24,4 @@
 #define SYS_exec2  24
 #define SYS_list   25
 #define SYS_setmemorylimit 26
+#define SYS_thread_create 27

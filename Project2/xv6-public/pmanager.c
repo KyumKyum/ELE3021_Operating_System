@@ -45,7 +45,8 @@ recv_cmd(char *buf, int buf_size){
 void
 run_cmd(int cmd, char *buf){
 char* argv[MAX_ARGV]; //* String For Argument Parsing
-int pid; 
+int pid;
+int rear = 0; //* Indicates the last element. e.g.)  execute's stacksize.
 
   switch(cmd){
     case LIST: //* list
@@ -58,7 +59,7 @@ int pid;
       break;
 
     case KILL: //* kill
-      parse_argument(buf, argv, BUF_SIZE);
+      parse_argument(buf, argv, BUF_SIZE, &rear);
 
       pid = atoi(argv[0]);
       
@@ -79,16 +80,16 @@ int pid;
     case EXEC:
       //* Execute
 
-      parse_argument(buf, argv, BUF_SIZE);
-      int stacksize = atoi(argv[1]);
+      parse_argument(buf, argv, BUF_SIZE, &rear);
+      int stacksize = atoi(argv[rear]); //* End of argument: stack size
 
-      argv[1] = 0; //* Remove current stacksize argument
+      argv[rear] = 0; //* Remove current stacksize argument
       exec2(argv[0], argv, stacksize); // argv[0]: path, argv[1]: stacksize
 	//wait();
       break;
 
     case MEMLIM:
-      parse_argument(buf, argv, BUF_SIZE);
+      parse_argument(buf, argv, BUF_SIZE, &rear);
 
       pid = atoi(argv[0]);
       int lim = atoi(argv[1]);
@@ -171,7 +172,7 @@ char* null_eliminate(char* cmd, int buf_size){
   return cmd;
 }
 
-char** parse_argument(char* cmd, char** argv, int buf_size){
+char** parse_argument(char* cmd, char** argv, int buf_size, int *rear){
   int argvsz = 0; //* argument size
   int start = 0; //* Argument starts
   int argvnum = 0;//* number of arguments
@@ -206,6 +207,7 @@ char** parse_argument(char* cmd, char** argv, int buf_size){
 
     argvsz = 0;
     argvnum++;
+    (*rear)++; //* rear moved
     start = i+1; //* start from next pos
   }
 

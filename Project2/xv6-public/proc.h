@@ -55,6 +55,8 @@ struct proc {
   char name[16];               // Process name (debugging)
   int stacksize;	       //* Allocated Stack Page Size
   int memlim; 		       //* Memory Limit (Unlimited if 0 assigned)
+  int threadnum; 	       //* total thread number
+  struct thread_t *threads;    //* Thread for current process; defined in linked list
 };
 
 // Process memory is laid out contiguously, low addresses first:

@@ -4,6 +4,7 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "x86.h"
+#include "thread.h"
 #include "proc.h"
 #include "spinlock.h"
 
@@ -11,6 +12,8 @@ struct {
   struct spinlock lock;
   struct proc proc[NPROC];
 } ptable;
+
+static thread_t init_thread = {0};
 
 static struct proc *initproc;
 
@@ -75,6 +78,7 @@ allocproc(void)
 {
   struct proc *p;
   char *sp;
+  thread_t *th = &init_thread; //*Init Thread
 
   acquire(&ptable.lock);
 
@@ -115,6 +119,15 @@ found:
   //* Allocated stacksize and memory limit (Default)
   p->stacksize = 1;
   p->memlim = 0;
+
+  //* Thread init.
+  //memset(p->threads, 0, sizeof(thread_t *));
+  p->threads = threadinit(th);
+ 
+  //* Allocate initialized thread to process.
+  p->threadnum = 0; //* Empty thread.
+  cprintf("Proc [%d] Init: thread head - tid: %d\n",p->pid, p->threads->tid);
+
   return p;
 }
 
@@ -171,6 +184,7 @@ growproc(int n)
     cprintf("FATAL ERROR: Out of memory - allocated more than its limitation.\n");
     return -1;
   }
+
 
   if(n > 0){
     if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0)
@@ -333,6 +347,7 @@ void
 scheduler(void)
 {
   struct proc *p;
+  //thread_t *cthread;
   struct cpu *c = mycpu();
   c->proc = 0;
   
@@ -359,6 +374,16 @@ scheduler(void)
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
+      //cthread = p->threads;
+      
+      //* Run Thread
+      if(p->threadnum > 0){
+	cprintf("Thread Num : %d\n", p->threadnum);
+	//while(cthread->next != 0){
+	  //cthread = cthread->next;
+          //cprintf("PID: %d, Thread Exists. Tid: \n", p->pid, cthread->tid);
+	//}
+      }
     }
     release(&ptable.lock);
 
@@ -586,7 +611,7 @@ setmemorylimit(int pid, int limit){
    break;
  }
 
- if(limit < p->sz) //* Requested limit is less than size.
+ if(limit != 0 && limit < p->sz) //* Requested limit is less than size. (0: no limitation)
    return -1; 
 
  //* Limit Allocation
@@ -596,14 +621,113 @@ setmemorylimit(int pid, int limit){
  return 0;
 }
 
+//* Thread util functions
+//* bindthread: bind new thread to current process.
 int
-sys_setmemorylimit(void){
-  int pid, lim;
-  if(argint(0, &pid) < 0)
+bindthread(thread_t *thread){
+  struct proc *curproc = myproc();
+  thread_t *cpthread = curproc->threads;
+
+  cprintf("Thread Init: Tid-%d\n", curproc->threads->tid);
+  //cprintf("Thread: Before Allocation\n");
+  if(allocthread(curproc, thread) < 0) //* Error occured while allocate space to thread.
     return -1;
 
-  if(argint(1, &lim) < 0)
+  //cprintf("Thread: After Allocation\n");
+  //cprintf("Thread: Before Link - current thread num: %d\n", curproc->threadnum);
+  //*Process Thread: Linked List.
+  for(int i = 0; i <= curproc->threadnum; i++){
+    if(i < curproc->threadnum){ //* Not a rear.
+      cpthread = cpthread->next;
+    }else{ //* Rear Reached.
+      cpthread->next = thread;
+      thread->tid = i + 1; //* give thread id
+      thread->prev = cpthread;
+      thread->next = 0;
+    }
+  }
+  //cprintf("Thread: After Link\n");
+
+  //* Thread Number Increment.
+  (curproc->threadnum)++;
+
+  //cprintf("Thread Bound: Current Number of threads %d\n", curproc->threadnum);
+  cprintf("-Thread List-\n");
+
+  cpthread = curproc->threads;
+  for(int i = 0; i < curproc->threadnum; i++){
+    cpthread = cpthread->next;
+    cprintf("Process %d - Thread %d: TID: %d\n", curproc->pid, i+1, cpthread->tid);
+  }
+
+  /*if(cpthread->next == 0){
+    // * Found Rear.
+    next = thread;
+    thread->next = 0;
+    thread->prev = cpthread;
+    (curproc->threadnum)++;
+    break;
+  }else{
+    // * There are next element.
+    cpthread = cpthread->next;
+  }*/
+
+  return 0;
+
+}
+
+//*allocthread: allocate memory space to thread.
+int
+allocthread(struct proc* parent, thread_t *thread){
+  struct proc p = {0};
+  struct proc * th_p = &p; //* This will work like a thread.
+  char* sp;
+
+  //cprintf("Thread Allocation: Before call th_p\n");
+  th_p->pid = parent->pid; //* Allocate parent's process id.
+  //cprintf("Thread Allocation: Before Kalloc()\n");
+  if((th_p->kstack = kalloc()) == 0) //* Allocation failed.
     return -1;
 
-  return setmemorylimit(pid, lim);
+  //cprintf("Thread Allocation: After Kalloc()\n");
+  sp = th_p->kstack + KSTACKSIZE;
+  // Leave room for trap frame.
+  sp -= sizeof *th_p->tf;
+  th_p->tf = (struct trapframe*)sp;
+
+  // Set up new context to start executing at forkret,
+  // which returns to trapret.
+  sp -= 4;
+  *(uint*)sp = (uint)trapret;
+
+  sp -= sizeof *th_p->context;
+  th_p->context = (struct context*)sp;
+  //cprintf("Thread Allocation: Before memset\n");
+  memset(th_p->context, 0, sizeof *th_p->context);
+  //cprintf("Thread Allocation: After memset\n");
+  th_p->context->eip = (uint)forkret;
+
+  //* Allocated stacksize and memory limit (Default)
+  th_p->stacksize = 1;
+  th_p->memlim = 0;
+  
+  //* Allocate to thread.
+  thread->p = th_p; 
+  //* Indicate parent process to current thread.
+  thread->parent = parent;
+
+  //cprintf("Thread Allocated: tid: %d, pid: %d\n", thread->tid, thread->parent->pid);
+  return 0; //* Allocated.
+}
+
+thread_t*
+threadinit(thread_t *thread){
+  memset(thread, 0, sizeof(thread));
+  thread->tid = 0;
+  thread->next = 0;
+  thread->prev = 0;
+  thread->retval = 0;
+  thread->terminated = 0;
+
+  return thread;
 }
