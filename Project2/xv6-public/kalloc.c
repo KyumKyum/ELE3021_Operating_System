@@ -1,6 +1,7 @@
 // Physical memory allocator, intended to allocate
 // memory for user processes, kernel stacks, page table pages,
 // and pipe buffers. Allocates 4096-byte pages.
+//* THREAD IMPLEMENTATION - Allocates Another 4096-byte page for thread.
 
 #include "types.h"
 #include "defs.h"
@@ -8,6 +9,7 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "spinlock.h"
+//#include "thread.h" //* thread implementation
 
 void freerange(void *vstart, void *vend);
 extern char end[]; // first address after kernel loaded from ELF file
@@ -48,7 +50,8 @@ freerange(void *vstart, void *vend)
 {
   char *p;
   p = (char*)PGROUNDUP((uint)vstart);
-  for(; p + PGSIZE <= (char*)vend; p += PGSIZE)
+  //* Allocate page for thread in consecutive location.
+  for(; p + PGSIZE  <= (char*)vend; p += PGSIZE)
     kfree(p);
 }
 //PAGEBREAK: 21
@@ -61,11 +64,11 @@ kfree(char *v)
 {
   struct run *r;
 
-  if((uint)v % PGSIZE || v < end || V2P(v) >= PHYSTOP)
+  if((uint)v % (PGSIZE) || v < end || V2P(v) >= PHYSTOP) 
     panic("kfree");
 
   // Fill with junk to catch dangling refs.
-  memset(v, 1, PGSIZE);
+  memset(v, 1, (PGSIZE));
 
   if(kmem.use_lock)
     acquire(&kmem.lock);
@@ -87,8 +90,9 @@ kalloc(void)
   if(kmem.use_lock)
     acquire(&kmem.lock);
   r = kmem.freelist;
-  if(r)
+  if(r){
     kmem.freelist = r->next;
+  }
   if(kmem.use_lock)
     release(&kmem.lock);
   return (char*)r;

@@ -13,6 +13,7 @@ struct cpu {
   struct proc *proc;           // The process running on this cpu or null
 };
 
+
 extern struct cpu cpus[NCPU];
 extern int ncpu;
 
@@ -28,17 +29,16 @@ extern int ncpu;
 // at the "Switch stacks" comment. Switch doesn't save eip explicitly,
 // but it is on the stack and allocproc() manipulates it.
 struct context {
-  uint edi;
-  uint esi;
-  uint ebx;
-  uint ebp;
-  uint eip;
+  uint edi; //* Destination Index; Saves destination address when copying 
+  uint esi; //* Source Index; Saves source address when copying
+  uint ebx; //* Base Register
+  uint ebp; //* Base Pointer; Saves the first address of the stack
+  uint eip; //* Instruction Pointer; points address of next insruction
 };
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 // Per-process state
 //
-//* New Process Structure: Process dedicated for MLFQ scheduling
 struct proc {
   uint sz;                     // Size of process memory (bytes)
   pde_t* pgdir;                // Page table
@@ -56,7 +56,8 @@ struct proc {
   int stacksize;	       //* Allocated Stack Page Size
   int memlim; 		       //* Memory Limit (Unlimited if 0 assigned)
   int threadnum; 	       //* total thread number
-  struct thread_t *threads;    //* Thread for current process; defined in linked list
+  char *tstack;		       //* Top of thread stack for this process;
+  struct thread_t* threads[100]; //* Threads available.
 };
 
 // Process memory is laid out contiguously, low addresses first:

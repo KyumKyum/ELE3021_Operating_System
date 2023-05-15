@@ -100,26 +100,16 @@ found:
     p->state = UNUSED;
     return 0;
   }
-  sp = p->kstack + TSTACKSIZE;
-  //p->tstack = sp; //* Thread Stack bottom.
-  
-  //* Allocate 100 thread space in here.
-  //* Each Thread: requires 20 bytes.
-  for(int i = 0; i < TMAXPERPROC; i++){
-    memset(sp, 0, sizeof(thread_t));
-    p->threads[i] = (struct thread_t*)sp; //* Allocate address
-    sp -= sizeof(thread_t);
-  }
-  p->tstack = sp; //* Thread Stack Top.
-
-  sp = sp + KSTACKSIZE - TSTACKSIZE; //* Rest of the stack: process space
+  sp = p->kstack + (KSTACKSIZE/2);
+  p->tstack = sp; //* Thread Stack bottom.
+  sp = sp + (KSTACKSIZE/2); 
   /*
    *  --------
-   * |  2096  |
+   * |  2048  |
    * |  proc  |
    * |        |
    *  --------
-   * |  2000  |
+   * |  2048  |
    * | thread |
    * |        |
    *  --------
@@ -646,6 +636,59 @@ setmemorylimit(int pid, int limit){
 }
 
 //* Thread util functions
+//* bindthread: bind new thread to current process.
+int
+bindthread(thread_t *thread){
+  //struct proc *curproc = myproc();
+  /*thread_t *cpthread = curproc->threads;
+
+  cprintf("Thread Init: Tid-%d\n", curproc->threads->tid);
+  //cprintf("Thread: Before Allocation\n");
+  if(allocthread(curproc, thread) < 0) // * Error occured while allocate space to thread.
+    return -1;
+
+  //cprintf("Thread: After Allocation\n");
+  //cprintf("Thread: Before Link - current thread num: %d\n", curproc->threadnum);
+  // *Process Thread: Linked List.
+  for(int i = 0; i <= curproc->threadnum; i++){
+    if(i < curproc->threadnum){ // * Not a rear.
+      cpthread = cpthread->next;
+    }else{ // * Rear Reached.
+      cpthread->next = thread;
+      thread->tid = i + 1; // * give thread id
+      thread->prev = cpthread;
+      thread->next = 0;
+    }
+  }
+  //cprintf("Thread: After Link\n");
+
+  // * Thread Number Increment.
+  (curproc->threadnum)++;
+
+  //cprintf("Thread Bound: Current Number of threads %d\n", curproc->threadnum);
+  cprintf("-Thread List-\n");
+
+  cpthread = curproc->threads;
+  for(int i = 0; i < curproc->threadnum; i++){
+    cpthread = cpthread->next;
+    cprintf("Process %d - Thread %d: TID: %d\n", curproc->pid, i+1, cpthread->tid);
+  }*/
+
+  /*if(cpthread->next == 0){
+    // * Found Rear.
+    next = thread;
+    thread->next = 0;
+    thread->prev = cpthread;
+    (curproc->threadnum)++;
+    break;
+  }else{
+    // * There are next element.
+    cpthread = cpthread->next;
+  }*/
+
+  return 0;
+
+}
 void
 test(struct proc* p){
   p->threads[0]->tid = 1;
@@ -660,15 +703,12 @@ allocthread(thread_t *thread){
   int tidx = curproc->threadnum; //* Thread number will be thread index.
 
   //*Start Allocation.
+  thread_t* th = curproc->threads[tidx];
+  th->tid = tidx + 1;
+  th->pid = curproc->pid;
 
-  thread_t* th = curproc->threads[tidx]; //* start to allocate nth thread.
-  th->tid = tidx + 1; //* allocate thread id
-  th->pid = curproc->pid; //* allocate thread parent process id
-  th->start_routine = thread->start_routine; //* allocate start routine.
-  th->arg = thread->arg; //* allocate arguments.
-
-  //* TODO: ctx, trapframe.
-  curproc->threadnum = tidx + 1;;
+  ++(curproc->threadnum);
+  
 
   return 0; //* Allocated.
 }

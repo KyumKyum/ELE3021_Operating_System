@@ -15,9 +15,11 @@ thread_create(thread_t *thread, void*(*start_routine)(void*), void *arg){
   thread->start_routine = start_routine;
   thread->arg = arg;
 
+  //cprintf("Size of process: %d\n", sizeof(struct proc));
+  //cprintf("Size of thread: %d\n", sizeof(thread_t));
   //cprintf("Before bind\n");
   //cprintf("Args: %s", (char*)arg);
-  if(bindthread(thread) < 0) //* Error: Thread allocation Failed. 
+  if(allocthread(thread) < 0) //* Error: Thread allocation Failed. 
     return -1;
 
   return 0;
