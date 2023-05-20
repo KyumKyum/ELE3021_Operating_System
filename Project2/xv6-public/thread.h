@@ -9,10 +9,11 @@
 typedef struct thread_t{
   ushort		tid;
   ushort		pid;
+  ushort		exitcalled;
+  void*			retval;
   void*(*start_routine)(void*);
+  struct proc*		parent;
   void* 		arg;
-  struct context* 	context; // * Thread's context.
-  struct trapframe* 	tf; // * Thread's Trap Frame 
 }thread_t; 
 
 
@@ -21,7 +22,16 @@ typedef struct thread_t{
 
 //* Function Prototypes
 int thread_create(thread_t*, void*(*start_routine)(void*), void*);
-//void thread_exit(void*);
+void thread_exit(void*);
+int thread_join(thread_t, void**);
+//* Function in service
 thread_t thread_self();
 int allocthread(thread_t*);
+void terminatethread(void*);
+void cleanupthread(struct proc*);
+int waitthread(thread_t, void**);
 struct thread_t* threadinit(thread_t*);
+
+//* thread syscalls.
+int             fetchthread(uint, thread_t*);
+int             argthread(int, thread_t*);

@@ -56,8 +56,12 @@ struct proc {
   int stacksize;	       //* Allocated Stack Page Size
   int memlim; 		       //* Memory Limit (Unlimited if 0 assigned)
   int threadnum; 	       //* total thread number
-  char *tstack;		       //* Top of thread stack for this process;
-  struct thread_t* threads[100]; //* Threads available.
+  int isthread;		       //* flag variable shows current process is thread or not.
+  struct thread_t *thread;      //* contains thread information.
+  int thctr;			//* number of thread created: used for making new thread id.
+  //char *tstack;		       //* Top of thread stack for this process;
+  //struct thread_t* threads[100]; //* TODO: Need to remove Threads available.
+  //int tgttid; 			//* shows target thread to schedule. -1 if there is no thread.
 };
 
 // Process memory is laid out contiguously, low addresses first:

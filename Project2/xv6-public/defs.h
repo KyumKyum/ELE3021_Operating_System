@@ -197,6 +197,10 @@ int             exec2(char*, char**, int);
 int		list();
 int		setmemorylimit();
 
+
+//*TODO: Need to remove before submission.
+void		printreg(int);
+
 //*Threads
 //* int thread_create(thread_t*, void*(*start_routine)(void*), void*);
 // number of elements in fixed-size array

@@ -6,6 +6,7 @@
 #include "proc.h"
 #include "x86.h"
 #include "syscall.h"
+#include "thread.h"
 
 // User code makes a system call with INT T_SYSCALL.
 // System call number in %eax.
@@ -45,6 +46,20 @@ fetchstr(uint addr, char **pp)
   return -1;
 }
 
+//* fetchthread -> get thread from user program.
+//* implemented based on fetchint()
+int
+fetchthread(uint addr, thread_t* tp){
+  struct proc *curproc = myproc();
+
+  if(addr >= curproc->sz || addr+sizeof(thread_t) > curproc->sz){
+    return -1;
+  }
+
+  *tp = *(thread_t*)(addr);
+  return 0;
+}
+
 // Fetch the nth 32-bit system call argument.
 int
 argint(int n, int *ip)
@@ -82,6 +97,13 @@ argstr(int n, char **pp)
   return fetchstr(addr, pp);
 }
 
+//* Get the thread from userprogram.
+//* Implemented based on argint()
+int
+argthread(int n, thread_t* tp){
+  return fetchthread((myproc()->tf->esp) + 4 + 4*n, tp);
+}
+
 extern int sys_chdir(void);
 extern int sys_close(void);
 extern int sys_dup(void);
@@ -108,6 +130,8 @@ extern int sys_exec2(void);
 extern int sys_list(void);
 extern int sys_setmemorylimit(void);
 extern int sys_thread_create(void);
+extern int sys_thread_exit(void);
+extern int sys_thread_join(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    		sys_fork,
@@ -136,6 +160,8 @@ static int (*syscalls[])(void) = {
 [SYS_list]		sys_list,
 [SYS_setmemorylimit] 	sys_setmemorylimit,
 [SYS_thread_create]	sys_thread_create,
+[SYS_thread_exit]	sys_thread_exit,
+[SYS_thread_join]	sys_thread_join,
 };
 
 void

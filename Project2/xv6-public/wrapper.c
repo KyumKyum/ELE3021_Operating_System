@@ -32,11 +32,47 @@ sys_thread_create(void){
   void*(*start_routine)(void*) = 0;
   void* arg;
 
-  if(argptr(0, (char**)&thread, sizeof(thread_t *)) < 0 || argptr(1, (char**)&(*start_routine), sizeof(void*)) < 0 
+  if(argptr(0, (char**)&thread, sizeof(thread_t *)) < 0 || argptr(1, (char**)&(start_routine), sizeof(void*)) < 0 
 		  || argptr(2, (char**)&arg, sizeof(void*)) < 0){
     cprintf("sys_thread_create: read args failed.\n");
     return -1;
   }
 
+  //*Test
+  //cprintf("Address of thread: %d\n", &thread);
+  //cprintf("Address of start_routine: %d\n", &start_routine);
+  //cprintf("Address of arg: %d\n", &arg);
+
   return thread_create(thread, start_routine, arg);
+}
+
+//*thread_exit - thread.c
+int
+sys_thread_exit(void){
+  void* retval;
+  
+  if((argptr(0, (char**)&retval, sizeof(void*))) < 0){
+    cprintf("sys_thread_exit: read args failed.\n");
+    return -1;
+  }
+
+  thread_exit(retval);
+
+  return 0;
+}
+
+//*thread_join - thread.c
+int
+sys_thread_join(void){
+  thread_t thread;
+  void** retval;
+
+   if(argthread(0, &thread) < 0 || argptr(1, (char**)&retval, sizeof(void**)) < 0 ){
+     cprintf("sys_thread_join: read args failed.\n");
+     return -1;
+   }
+
+   waitthread(thread, retval);
+   return 0;
+  
 }
