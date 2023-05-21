@@ -10,6 +10,7 @@ typedef struct thread_t{
   ushort		tid;
   ushort		pid;
   ushort		exitcalled;
+  ushort		occupied;
   void*			retval;
   void*(*start_routine)(void*);
   struct proc*		parent;
@@ -35,3 +36,4 @@ struct thread_t* threadinit(thread_t*);
 //* thread syscalls.
 int             fetchthread(uint, thread_t*);
 int             argthread(int, thread_t*);
+int		argvdptr(int, void***, int);

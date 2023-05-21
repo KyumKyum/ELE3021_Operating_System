@@ -13,7 +13,7 @@ struct {
   struct proc proc[NPROC];
 } ptable;
 
-//static thread_t init_thread = {0};
+thread_t threadlist[NPROC] = {0};
 
 static struct proc *initproc;
 
@@ -154,7 +154,9 @@ found:
   p->memlim = 0;
   p->isthread = 0;
   //* Thread init.
-  //memset(p->threads, 0, sizeof(thread_t *));
+  //p->thread = 0;
+  p->thctr = 0;
+  //memset(p->thread, 0, sizeof(thread_t *));
  
   //* Allocate initialized thread to process.
   p->threadnum = 0; //* Empty thread.
@@ -309,13 +311,13 @@ exit(void)
   acquire(&ptable.lock);
 
   //* Wake up parent if current process is thread.
-  if(curproc->isthread == 1){
-    //* I just put in here for thread.
-    //* I thought wakeup1 in below will also handle all process and thread,
-    //* but it occurs some wierd page fault (trap 14 at 0xffffffff)
-    //* So I added it in here, and it seems works...but I don't know why :(
+  /* if(curproc->isthread == 1){
+    // * I just put in here for thread.
+    // * I thought wakeup1 in below will also handle all process and thread,
+    // * but it occurs some wierd page fault (trap 14 at 0xffffffff)
+    // * So I added it in here, and it seems works...but I don't know why :(
     wakeup1(curproc->parent);
-  }
+  }*/
 
   // Parent might be sleeping in wait().
   wakeup1(curproc->parent);
@@ -673,8 +675,9 @@ setmemorylimit(int pid, int limit){
 int
 allocthread(thread_t *thread){
   struct proc* curproc = myproc();
+  struct thread_t* destthread;
   uint sp = 0; 
-  //uint sz = 0;
+  //char* stack = 0;
   uint ustack[2]; //* size: basic stack 2:
 		  // fake return counter, address of argument, termination
   int tid = ++(curproc->thctr); //* Thread counter will be new thread id.
@@ -682,12 +685,37 @@ allocthread(thread_t *thread){
   pde_t *pgdir = 0;
 
   //* Step 1) Thread init
-  thread->pid = curproc->pid;
+  //* Find Vacant Thread.
+  
+  for(destthread = threadlist; destthread < &threadlist[NPROC]; destthread++){
+    if(destthread->occupied == 0){
+      break;
+    }
+  }
+
+  if(destthread >= &threadlist[NPROC]){
+    //*Cannot find space.
+    cprintf("Allocation Failed while finding thread space.\n");
+    goto failed;
+  }
+
+  //* Allocation
+  //
+  thread->pid = curproc -> pid;
   thread->tid = tid;
   thread->parent = curproc;
   thread->retval = 0;
   thread->exitcalled = 0;
-  
+
+  destthread->pid = curproc->pid;
+  destthread->tid = tid;
+  destthread->parent = curproc;
+  destthread->retval = 0;
+  destthread->exitcalled = 0;
+  destthread->start_routine = thread->start_routine;
+  destthread->arg = thread->arg;
+  //*Now Occupied
+  destthread->occupied = 1;
 
   //*Start Allocation.
   if((newthread = allocproc()) <= 0){
@@ -699,27 +727,20 @@ allocthread(thread_t *thread){
   //* Thread will be made based on parent's info.
   //* Allocate thread
   newthread->pid = curproc->pid;
-  //newthread->thread->pid = curproc->pid;
-  //newthread->thread->tid = tid;
-  //newthread->thread->parent = curproc;
-  //newthread->thread->retval = 0;
-  //newthread->thread->exitcalled = 0;
-  newthread->thread = thread; // * Thread Allocation.
   newthread->isthread = 1; // * This process is thread.
   newthread->sz = curproc->sz; //* Thread size will follow parent's size.
   //* Copy parent's trap frame
   *newthread->tf = *curproc->tf;
 
+  //* 2) Thread Allocation.
+  newthread->thread = destthread;
+  
   //* 3)Executable Stack Allocation.
   //* Copy parent's page directory. - Referrences fork();
   if((pgdir = copyuvm(curproc->pgdir, curproc->sz)) <= 0){
     cprintf("Allocation Failed while copying parent's page\n");
     goto failed;
   }
-  //if((sz = allocuvm(pgdir, sz, sz + PGSIZE)) <= 0){
-    //cprintf("Allocation Failed while allocating user page\n");
-    //goto failed;
-  ///}
 
 
   //* Allocate stack frame.
@@ -743,7 +764,6 @@ allocthread(thread_t *thread){
   newthread->tf->eip = (uint)newthread->thread->start_routine;
   newthread->tf->esp = sp;
 
-
   //* 5) file copy - reffered fork()
   //* I think this was unnecessary
   //* however if I remove this, I get wierd deadlock :(
@@ -762,9 +782,11 @@ allocthread(thread_t *thread){
   //* Make it runnable state.
   acquire(&ptable.lock);
   newthread->state = RUNNABLE;
+  //newthread->thread = thread;
   release(&ptable.lock);
 
-  cprintf("allocated: %d\n", newthread->pid);
+  //newthread->thread = thread;
+  ++(newthread->threadnum);
   return 0;
 
 
@@ -773,11 +795,6 @@ failed:
     freevm(pgdir);
   }
 
-  if(newthread->kstack > 0){
-    kfree(newthread->kstack);
-    newthread->kstack = 0;
-    newthread->state = UNUSED;
-  }
   cprintf("thread allocation failed\n");
   return -1;
 }
@@ -791,7 +808,6 @@ terminatethread(void* retval){
   //int fd;
 
   acquire(&ptable.lock);
-  cprintf("tid: %d\n", curthread->thread->tid);
   //* Step 1) set return value.
   curthread->thread->retval = retval;
   curthread->thread->exitcalled = 1; //* This thread had just been ended.
@@ -803,10 +819,7 @@ terminatethread(void* retval){
   curthread->state = ZOMBIE; //* Zombie State
   
   //* Step 4) Wake up parent process, and call sched();
-  cprintf("WAKEUP: parent pid: %d\n", curthread->thread->parent->pid);
   wakeup1(curthread->thread->parent);
-  cprintf("Exit called tid: %d\n", curthread->thread->tid);
-
   sched();
   //release(&ptable.lock);
 }
@@ -829,7 +842,6 @@ waitthread(thread_t thread, void** retval){
       break; //* Thread Found
   }
 
-  cprintf("Called thread tid: %d\n", tgtthread->thread->tid);
  
   if(tgtthread == 0){
     cprintf("thread_join: invalid thread.\n");
@@ -838,31 +850,30 @@ waitthread(thread_t thread, void** retval){
   }
 
   if(tgtthread->thread->parent != curproc){
-    //* Thread can only be joined to it's caller.
+    // * Thread can only be joined to it's caller.
     cprintf("thread_join: not a caller\n");
     release(&ptable.lock);
     return -1;
   }
 
-  //* Step 2) wait until current thread end.
-  while(1){ //* Circular Wait.
+  // * Step 2) wait until current thread end.
+  while(1){ // * Circular Wait.
     if((tgtthread->thread->exitcalled == 1) && (tgtthread->state == ZOMBIE)){
-      //* Current thread had just been ended.
-      //* Step 3) Save Return Value.
+      // * Current thread had just been ended.
+      // * Step 3) Save Return Value.
+      cprintf("tid: %d, retval: %d\n", tgtthread->thread->tid, tgtthread->thread->retval);
       *retval = tgtthread->thread->retval;
-      cprintf("found!\n");
-      //* Step 4) Clean up thread.
+      // * Step 4) Clean up thread.
       cleanupthread(tgtthread);
       release(&ptable.lock);
       return 0;
     }
 
-    //* Sleep until it's child calls thread_exit(), waking up its parent(current process).
-    cprintf("Goes sleep: pid: %d\n", curproc->pid);
+    // * Sleep until it's child calls thread_exit(), waking up its parent(current process).
     sleep(curproc, &ptable.lock);
   }
 
-  cprintf("thread_join: Unreachable statement. It must be an error.\n");
+  release(&ptable.lock);
   return -1;
 }
 
@@ -881,7 +892,9 @@ cleanupthread(struct proc* tgtthread){
   tgtthread->thread->start_routine = 0;
   tgtthread->thread->parent = 0;
   tgtthread->thread->arg = 0;
+  tgtthread->thread->occupied = 0;
   tgtthread->thread = 0;
+
 
   //* Clean thread process.
   kfree(tgtthread->kstack);

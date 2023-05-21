@@ -12,6 +12,7 @@ int
 thread_create(thread_t *thread, void*(*start_routine)(void*), void *arg){
   //* Thread Creation
 
+  memset(thread, 0, sizeof(thread));
   thread->start_routine = start_routine;
   thread->arg = arg;
 

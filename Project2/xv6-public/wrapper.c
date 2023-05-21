@@ -67,7 +67,7 @@ sys_thread_join(void){
   thread_t thread;
   void** retval;
 
-   if(argthread(0, &thread) < 0 || argptr(1, (char**)&retval, sizeof(void**)) < 0 ){
+   if(argthread(0, &thread) < 0 || argptr(1, (char**)&retval, sizeof(void**)) < 0){
      cprintf("sys_thread_join: read args failed.\n");
      return -1;
    }
