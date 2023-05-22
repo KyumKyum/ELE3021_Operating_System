@@ -186,7 +186,7 @@ void            switchuvm(struct proc*);
 void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
-
+pde_t*		shareuvm(pde_t*, struct proc*);
 
 //* Implementation for Project #2
 

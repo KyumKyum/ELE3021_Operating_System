@@ -6,7 +6,7 @@
 void* thread_test(void* data){
   char* threadName = (char*) data; //* Extract data from thread -> Passed by argument.
   printf(0, "[1] Thread Called! Name: %s\n", threadName);
-  thread_exit((void*)1);
+  thread_exit((void*)0);
   //exit();
   return (void*)0;
 }
@@ -21,15 +21,16 @@ void* thread_test2(void* data){
 }
 
 int
-test(void*(*start_routine)(void*), void* data){
-  start_routine(data);
+test(void** data){
+  int *val =  (int*)777;
+  *data = (void*)val;
   return 0;
 }
 
 int
 main(){
   thread_t t_thread[3]; //* Thread Declaration.
-  int res[3] = {0,0,0}; //* thread result.
+  void* res[3]; //* thread result.
   char t1[] = "THREAD_1";
   char t2[] = "THREAD_2";
   //char t3[] = "THREAD_3";
@@ -47,11 +48,13 @@ main(){
   thread_create(&t_thread[1], thread_test2, (void*) t2);
   //thread_create(&t_thread[2], (void*)thread_test2, (void*) t3); 
  
-  thread_join(t_thread[0], (void**)&res[0]);
-  thread_join(t_thread[1], (void**)&res[1]);
+  thread_join(t_thread[0], &res[0]);
+  thread_join(t_thread[1], &res[1]);
   
-  printf(0, "thread_join called: Thread 0 finished with value %d\n", res[0]);
-  printf(0, "thread_join called: Thread 1 finished with value %d\n", res[1]);
+  //test((void**)&res[0]);
+
+  printf(0, "thread_join called: Thread 0 finished with value %d\n", *(int*)res[0]);
+  printf(0, "thread_join called: Thread 1 finished with value %d\n", *(int*)res[1]);
 
   exit();
 }

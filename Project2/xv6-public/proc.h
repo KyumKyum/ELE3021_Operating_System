@@ -59,7 +59,7 @@ struct proc {
   int isthread;		       //* flag variable shows current process is thread or not.
   struct thread_t *thread;      //* contains thread information.
   int thctr;			//* number of thread created: used for making new thread id.
-  //char *tstack;		       //* Top of thread stack for this process;
+  char *tstack;		       //* Top of thread stack for this process;
   //struct thread_t* threads[100]; //* TODO: Need to remove Threads available.
   //int tgttid; 			//* shows target thread to schedule. -1 if there is no thread.
 };

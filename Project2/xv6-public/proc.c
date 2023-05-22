@@ -109,6 +109,9 @@ found:
     return 0;
   }
   sp = p->kstack + KSTACKSIZE;
+  //sp = p->kstack + THREADSPACE;
+  //p->tstack = sp;
+  //sp = sp + (KSTACKSIZE - THREADSPACE);
   //* Current Stack Bottom: Thread space bottom
   //p->tstack = sp;
 
@@ -125,11 +128,11 @@ found:
 
   /*
    *  --------
-   * |  2096  |
+   * |  2048  |
    * |  proc  |
    * |        |
    *  --------
-   * |  2000  |
+   * |  2048  |
    * | thread |
    * |        |
    *  --------
@@ -258,6 +261,9 @@ fork(void)
     return -1;
   }
   np->sz = curproc->sz;
+  if(curproc->isthread == 1){
+    np->parent = curproc->thread->parent; //* Prevent process being zombie if thread terminated.
+  }
   np->parent = curproc;
   *np->tf = *curproc->tf;
 
@@ -759,6 +765,7 @@ allocthread(thread_t *thread){
     cprintf("Allocation Failed while copying parent's page\n");
     goto failed;
   }
+  //pgdir = shareuvm(pgdir, curproc);
 
 
   //* Allocate stack frame.

@@ -344,6 +344,59 @@ bad:
   return 0;
 }
 
+//* Shareuvm()
+//* Unlike copyuvm, child will share address space with parent.
+//* Implemented based on copyuvm(), loaduvm(), and walkpgdir()
+pde_t*
+shareuvm(pde_t* pgdir, struct proc* parent){
+  pde_t *dest;
+  pte_t *pgkern;
+  pte_t *parent_pg;
+  uint paddr, flags;
+
+  //* STEP 1) init pgdir -> setupkvm();
+  if((dest = setupkvm()) == 0)
+    return 0;
+
+  //* STEP 2) Allocate same page with parent to child.
+  parent_pg = parent->pgdir;
+  //* Start iteration: Will iterate all parent's pgdir
+  //* the copy the valid pgdir.
+  for(int i = 0; i < NPDENTRIES; i++){ //* Iterate Directories Loop
+    if(parent_pg[i] & PTE_P){ //* Valid. (Present)
+      dest[i] = parent_pg[i]; //* Share.
+      
+      //* STEP 3), now, it will iterate page table entries
+      //* and copy the valid entries, just like outer loop.
+      //* Got an idea from walkpgdir and 
+      pgkern = (pte_t*)P2V(PTE_ADDR(pgdir[i])); //* Get addr based on kernel base. 
+
+      for(int j = 0; j < NPTENTRIES; j++){ //* Iterate Page Table Enteries Loop
+        //* Copy valid entries.
+	if(pgkern[j] & PTE_P){
+	  //*Valid!
+	  //* Get physical address of the page
+	  paddr = PTE_ADDR(pgkern[j]);
+	  flags = PTE_FLAGS(pgkern[j]);
+
+	  //* STEP 4) Based on the physical address calculated,
+	  //* map those address to child.
+	  //ch_paddr = &(((pte_t *)P2V(PTE_ADDR(dest[i])))[j]); //* Based on Stack Overflow.
+	  if(mappages(dest, (void*)(PTE_ADDR(dest[i]) + PGSIZE * j), PGSIZE, paddr, flags) < 0){
+	    goto failed;
+	  }
+	}
+      }
+    }
+  }
+
+  return dest;
+
+failed:
+  freevm(dest);
+  return 0;
+}
+
 //PAGEBREAK!
 // Map user virtual address to kernel address.
 char*

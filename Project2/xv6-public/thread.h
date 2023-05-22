@@ -36,4 +36,4 @@ void purgethreads(struct proc*, struct proc*);
 //* thread syscalls.
 int             fetchthread(uint, thread_t*);
 int             argthread(int, thread_t*);
-int		argvdptr(int, void***, int);
+int		argvdptr(int, void**, int);

@@ -86,7 +86,7 @@ argptr(int n, char **pp, int size)
 
 //* Fetch double void pointer
 int
-argvdptr(int n, void ***ptr, int size){
+argvdptr(int n, void **ptr, int size){
   int i;
   struct proc* curproc = myproc();
 
@@ -94,7 +94,7 @@ argvdptr(int n, void ***ptr, int size){
     return -1;
   if(size < 0 || (uint)i >= curproc->sz || (uint)i+size > curproc->sz)
     return -1;
-  *ptr = (void**)i;
+  *ptr = (void*)i;
   return 0;
 }
 
