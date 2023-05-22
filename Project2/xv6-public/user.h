@@ -30,6 +30,8 @@ int list(void);
 int exec2(char*, char**, int);
 int kill(int);
 int setmemorylimit(int, int);
+void iomutexcheckin(void);
+void iomutexcheckout(void);
 
 
 // ulib.c

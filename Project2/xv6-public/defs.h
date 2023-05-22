@@ -196,10 +196,9 @@ int             exec2(char*, char**, int);
 //*proc.c
 int		list();
 int		setmemorylimit();
+void		iomutexcheckin();
+void 		iomutexcheckout();
 
-
-//*TODO: Need to remove before submission.
-void		printreg(int);
 
 //*Threads
 //* int thread_create(thread_t*, void*(*start_routine)(void*), void*);

@@ -14,6 +14,7 @@ void* thread_test(void* data){
 void* thread_test2(void* data){
   char* threadName = (char*)data;
   printf(0, "[2] Thread called! Name: %s\n", threadName);
+  fork();
   thread_exit((void*)1);
   //exit();
   return (void*)0;

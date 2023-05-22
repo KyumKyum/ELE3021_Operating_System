@@ -11,6 +11,7 @@ putc(int fd, char c)
 static void
 printint(int fd, int xx, int base, int sgn)
 {
+  iomutexcheckin();
   static char digits[] = "0123456789ABCDEF";
   char buf[16];
   int i, neg;
@@ -33,6 +34,8 @@ printint(int fd, int xx, int base, int sgn)
 
   while(--i >= 0)
     putc(fd, buf[i]);
+
+  iomutexcheckout();
 }
 
 // Print to the given fd. Only understands %d, %x, %p, %s.

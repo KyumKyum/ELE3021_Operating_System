@@ -6,6 +6,7 @@
 #include "defs.h"
 #include "x86.h"
 #include "elf.h"
+#include "thread.h"
 
 int
 exec(char *path, char **argv)
@@ -18,6 +19,20 @@ exec(char *path, char **argv)
   struct proghdr ph;
   pde_t *pgdir, *oldpgdir;
   struct proc *curproc = myproc();
+  //struct proc *tgt;
+
+  //* Check if current process is thread
+  if(curproc->isthread == 1){
+    //* Eliminate other threads except this.
+    purgethreads(curproc->thread->parent, curproc);
+    
+  }
+
+  //* Check if current process contains thread
+  if(curproc->threadnum > 0){
+    //* Eliminate all thread.
+    purgethreads(curproc, 0);
+  }
 
   begin_op();
 

@@ -13,6 +13,8 @@ struct {
   struct proc proc[NPROC];
 } ptable;
 
+uint iomutex = 0; //* 0 - not using, 1 - using
+
 thread_t threadlist[NPROC] = {0};
 
 static struct proc *initproc;
@@ -287,6 +289,7 @@ void
 exit(void)
 {
   struct proc *curproc = myproc();
+  //struct proc* thr;
   struct proc *p;
   int fd;
 
@@ -306,18 +309,19 @@ exit(void)
   end_op();
   curproc->cwd = 0;
 
-  //* TODO: parent exit: kills all thread.
-  
   acquire(&ptable.lock);
 
-  //* Wake up parent if current process is thread.
-  /* if(curproc->isthread == 1){
-    // * I just put in here for thread.
-    // * I thought wakeup1 in below will also handle all process and thread,
-    // * but it occurs some wierd page fault (trap 14 at 0xffffffff)
-    // * So I added it in here, and it seems works...but I don't know why :(
-    wakeup1(curproc->parent);
+  //* parent exit: check all thread is done, if not, kill them.
+  /*for(thr = ptable.proc; thr < &ptable.proc[NPROC]; thr++){
+    if(thr->isthread == 1){
+      if(thr->thread->parent == curproc && thr->thread->exitcalled == 0){
+        thr->killed = 1;
+      }
+    }
   }*/
+  if(curproc->threadnum > 0){
+    purgethreads(curproc, 0);
+  }
 
   // Parent might be sleeping in wait().
   wakeup1(curproc->parent);
@@ -354,20 +358,26 @@ wait(void)
       if(p->parent != curproc)
         continue;
       havekids = 1;
+
       if(p->state == ZOMBIE){
         // Found one.
-        pid = p->pid;
-        kfree(p->kstack);
-        p->kstack = 0;
-        freevm(p->pgdir);
-        p->pid = 0;
-        p->parent = 0;
-        p->name[0] = 0;
-        p->killed = 0;
-	//* Thread reset
-	p->isthread = 0;
-	p->thread = 0;
-        p->state = UNUSED;
+	pid = p->pid;
+	if(p->isthread == 1){
+	  //* go to cleanupthread routine.
+	  cleanupthread(p);
+	}else{
+          kfree(p->kstack);
+          p->kstack = 0;
+          freevm(p->pgdir);
+          p->pid = 0;
+          p->parent = 0;
+          p->name[0] = 0;
+          p->killed = 0;
+	  //* Thread reset
+	  p->isthread = 0;
+	  p->thread = 0;
+          p->state = UNUSED;
+	}
         release(&ptable.lock);
         return pid;
       }
@@ -399,38 +409,30 @@ scheduler(void)
   //thread_t *cthread;
   struct cpu *c = mycpu();
   c->proc = 0;
-  renamelock("outside loop");
   for(;;){
     // Enable interrupts on this processor.
     sti();
     // Loop over process table looking for process to run.
-    renamelock("start loop");
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
        
-
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
       c->proc = p;
-      renamelock("bfg switchuvm");
       switchuvm(p);
-      renamelock("aft switchuvm");
       p->state = RUNNING;
 
       //cprintf("Context: eip - %d\n", p->context->eip);
-      renamelock("bf swtch");
       swtch(&(c->scheduler), p->context);
-      renamelock("aft swtch");
       switchkvm();
 
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
     }
-    renamelock("ptable");
     release(&ptable.lock);
   }
 }
@@ -629,16 +631,32 @@ procdump(void)
 int
 list(){
   struct proc *p;
+  struct proc *t;
+  uint procsz;
 
-  cprintf("-------------------------------------------------------------------------------------\n");
-  cprintf("| [PID] name / number of stack page / allocated memory (byte) / memory limit (byte) |\n");
-  cprintf("-------------------------------------------------------------------------------------\n");
+  cprintf("-----------------------------------------------------------------------------------------------------------------\n");
+  cprintf("| [PID] name / number of stack page / allocated memory (byte) / memory limit (byte) / Number of running threads |\n");
+  cprintf("-----------------------------------------------------------------------------------------------------------------\n");
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->state == UNUSED) //* skip the unused space.
+    procsz = 0; //* Init
+    if(p->state == UNUSED || p->isthread == 1 || p->state == ZOMBIE) //* skip the unused space and thread.
       continue;
 
-    cprintf("[%d] / %s / %d stacks / %d bytes allocated / ", p->pid, p->name, p->stacksize, p->sz);
-    p->memlim == 0 ? cprintf(" UNLIMITED \n") : cprintf(" %d byte(s) \n", p->memlim); //* memlim will be 0 if there is no memeory limitation.
+    procsz = p->sz;
+    if(p->threadnum > 0){
+      //* Find threads and sum it all.
+      for(t = ptable.proc; t < &ptable.proc[NPROC]; t++){
+        if(t->isthread == 1){
+	  if(t->thread->parent == p){
+	    procsz += t->sz; //* Add thread process size
+	  }
+	}
+      }
+    }
+
+    cprintf("[%d] / %s / %d stacks / %d bytes allocated /" , p->pid, p->name, p->stacksize, procsz);
+    p->memlim == 0 ? cprintf(" UNLIMITED /") : cprintf(" %d byte(s) /", p->memlim); //* memlim will be 0 if there is no memeory limitation.
+    cprintf(" Running %d threads\n", p->threadnum);
 
   }
 
@@ -677,7 +695,6 @@ allocthread(thread_t *thread){
   struct proc* curproc = myproc();
   struct thread_t* destthread;
   uint sp = 0; 
-  //char* stack = 0;
   uint ustack[2]; //* size: basic stack 2:
 		  // fake return counter, address of argument, termination
   int tid = ++(curproc->thctr); //* Thread counter will be new thread id.
@@ -692,6 +709,7 @@ allocthread(thread_t *thread){
       break;
     }
   }
+  
 
   if(destthread >= &threadlist[NPROC]){
     //*Cannot find space.
@@ -861,7 +879,6 @@ waitthread(thread_t thread, void** retval){
     if((tgtthread->thread->exitcalled == 1) && (tgtthread->state == ZOMBIE)){
       // * Current thread had just been ended.
       // * Step 3) Save Return Value.
-      cprintf("tid: %d, retval: %d\n", tgtthread->thread->tid, tgtthread->thread->retval);
       *retval = tgtthread->thread->retval;
       // * Step 4) Clean up thread.
       cleanupthread(tgtthread);
@@ -883,6 +900,8 @@ waitthread(thread_t thread, void** retval){
 //* CAUTION: MUST CALL WITH LOCKED PTABLE (acquire(&ptable.lock))
 void
 cleanupthread(struct proc* tgtthread){
+  //* Find parent
+  struct proc* parent = tgtthread->thread->parent;
   //* Start Cleaning Procedure.
   //* Clean thread space
   tgtthread->thread->pid = 0;
@@ -905,39 +924,44 @@ cleanupthread(struct proc* tgtthread){
   tgtthread->name[0] = 0;
   tgtthread->killed = 0;
   tgtthread->state = UNUSED;
+
+  //* Reduce number of thread.
+  --(parent->threadnum);
 }
 
-/*thread_t*
-threadinit(thread_t *thread){
-  memset(thread, 0, sizeof(thread));
-  thread->tid = 0;
-  thread->next = 0;
-  thread->prev = 0;
-  thread->retval = 0;
-  thread->terminated = 0;
-
-  return thread;
-}*/
-
-//* Test Functon: Prints registers
+//*purgethreads()
+//* Kill all thread it have.
 void
-printreg(int n){
- //struct proc* curproc = myproc();
+purgethreads(struct proc* p, struct proc* exception){
+  struct proc* tgt;
 
- //cprintf("[%d] Process %d -> ADDRESS: trapframe eip: %d, esp: %d\n",n, curproc->pid,  &(curproc->tf->eip), &(curproc->tf->esp));
- //cprintf("[%d] Process %d -> VALUE: trapframe eip: %d, esp: %d\n",n, curproc->pid,  (curproc->tf->eip), (curproc->tf->esp));
- //cprintf("[%d], Process %d -> context eip: %d\n", n, curproc->pid, curproc->context->eip);
- return;
+  for(tgt = ptable.proc; tgt < &ptable.proc[NPROC]; tgt++){
+    if(tgt->isthread == 1){
+      if(tgt != exception && tgt->thread->parent == p){
+        //* If current thread is not the exception (thread must be alive) 
+	//and current thread's parent is the same process passed from argument.
+	cleanupthread(tgt);
+      }
+    }
+  }
 }
 
-int
-sys_printreg(){
-  int n;
-
-  if(argint(0, &n)){
-    return -1;
+//* iomutex
+void
+iomutexcheckin(void){
+  //* If some other process using io resources,
+  //* wait until it releases.
+  while(iomutex){
+    yield();  
   }
 
-  printreg(n);
-  return 0;
+  iomutex = 1; //* current process will use io resource
 }
+
+void
+iomutexcheckout(void){
+  iomutex = 0;
+}
+
+
+

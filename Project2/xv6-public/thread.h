@@ -31,7 +31,7 @@ int allocthread(thread_t*);
 void terminatethread(void*);
 void cleanupthread(struct proc*);
 int waitthread(thread_t, void**);
-struct thread_t* threadinit(thread_t*);
+void purgethreads(struct proc*, struct proc*);
 
 //* thread syscalls.
 int             fetchthread(uint, thread_t*);

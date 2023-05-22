@@ -27,3 +27,5 @@
 #define SYS_thread_create 27
 #define SYS_thread_exit 28
 #define SYS_thread_join 29
+#define SYS_iomutexcheckin 30
+#define SYS_iomutexcheckout 31

@@ -24,6 +24,13 @@ static struct {
   int locking;
 } cons;
 
+//* IO Lock: IO Lock between cprintf
+//* Prevent Race Condition in Critical Section (for example, IO job)
+//* If some thread uses I/O operarion, it will simply yield.
+//
+
+//uint iomutex = 0;
+
 static void
 printint(int xx, int base, int sign)
 {
@@ -58,6 +65,14 @@ cprintf(char *fmt, ...)
   uint *argp;
   char *s;
 
+  //* If Someone uses IO(==1), it will call yield.
+
+  //while(iomutex){
+    //yield();
+  //}
+
+  //* Else, this process will use current IO.
+  //iomutex = 1;
   locking = cons.locking;
   if(locking)
     acquire(&cons.lock);
@@ -101,6 +116,8 @@ cprintf(char *fmt, ...)
 
   if(locking)
     release(&cons.lock);
+
+  //iomutex = 0; //* release
 }
 
 void

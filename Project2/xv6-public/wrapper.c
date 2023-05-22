@@ -76,3 +76,17 @@ sys_thread_join(void){
    return 0;
   
 }
+
+//*iomutexcheckin - proc.c
+int
+sys_iomutexcheckin(void){
+  iomutexcheckin();
+  return 0;
+}
+
+//*iomutexcheckout - proc.c
+int
+sys_iomutexcheckout(void){
+  iomutexcheckout();
+  return 0;
+}
