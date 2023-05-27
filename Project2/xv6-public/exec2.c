@@ -96,8 +96,6 @@ exec2(char *path, char **argv, int stacksize)
   curproc->stacksize = stacksize;
   curproc->memlim = 0;
 
-  cprintf("Allocated stacksize: %d\n", curproc->stacksize);
-
   // Push argument strings, prepare rest of stack in ustack.
   for(argc = 0; argv[argc]; argc++) {
     if(argc >= MAXARG)

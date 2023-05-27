@@ -14,7 +14,6 @@ main(){
 
     if(cmd == 5)
       goto exit; //* Exit!
-
     if(forkproc() == 0){
       run_cmd(cmd, buf);
     }
@@ -218,6 +217,7 @@ int forkproc(){
   int pid;
 
   pid = fork();
+  
   if(pid < 0)
     return -1;
 

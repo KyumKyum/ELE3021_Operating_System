@@ -38,11 +38,6 @@ sys_thread_create(void){
     return -1;
   }
 
-  //*Test
-  //cprintf("Address of thread: %d\n", &thread);
-  //cprintf("Address of start_routine: %d\n", &start_routine);
-  //cprintf("Address of arg: %d\n", &arg);
-
   return thread_create(thread, start_routine, arg);
 }
 
@@ -72,7 +67,7 @@ sys_thread_join(void){
      return -1;
    }
 
-   waitthread(thread, retval);
+   thread_join(thread, retval);
    return 0;
   
 }

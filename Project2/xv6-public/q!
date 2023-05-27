@@ -431,6 +431,7 @@ scheduler(void)
       switchuvm(p);
       p->state = RUNNING;
 
+      //cprintf("Context: eip - %d\n", p->context->eip);
       swtch(&(c->scheduler), p->context);
       switchkvm();
 
@@ -577,30 +578,12 @@ int
 kill(int pid)
 {
   struct proc *p;
-  struct proc *t;
 
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->pid == pid){
       p->killed = 1;
       // Wake process from sleep if necessary.
-      if(p->isthread != 1 && p->threadnum > 0){
-        for(t = ptable.proc; t < &ptable.proc[NPROC]; t++){
-	  if(t->isthread == 1){
-	    if(t->thread->parent == p){
-	      t->killed = 1;
-	    }
-	  }
-	}
-      }else if(p->isthread == 1){
-        for(t = ptable.proc; t < &ptable.proc[NPROC]; t++){
-          if(t->isthread == 1){
-            if(t->thread->parent == p->thread->parent){
-              t->killed = 1;
-            }
-          }
-        }
-      }
       if(p->state == SLEEPING)
         p->state = RUNNABLE;
       release(&ptable.lock);
@@ -726,12 +709,14 @@ allocthread(thread_t *thread){
 
   //* Step 1) Thread init
   //* Find Vacant Thread.
+  
   for(destthread = threadlist; destthread < &threadlist[NPROC]; destthread++){
     if(destthread->occupied == 0){
       break;
     }
   }
   
+
   if(destthread >= &threadlist[NPROC]){
     //*Cannot find space.
     cprintf("Allocation Failed while finding thread space.\n");
@@ -739,6 +724,7 @@ allocthread(thread_t *thread){
   }
 
   //* Allocation
+  //
   thread->pid = curproc -> pid;
   thread->tid = tid;
   thread->parent = curproc;
@@ -880,6 +866,7 @@ waitthread(thread_t thread, void** retval){
     if((tgtthread->isthread == 1) && (tgtthread->thread->tid == thread.tid))
       break; //* Thread Found
   }
+
  
   if(tgtthread == 0){
     cprintf("thread_join: invalid thread.\n");
@@ -887,16 +874,16 @@ waitthread(thread_t thread, void** retval){
     return -1;
   }
 
-  /*if((tgtthread->thread->parent != curproc) && (tgtthread->thread->parent != initproc)){
+  if(tgtthread->thread->parent != curproc){
     // * Thread can only be joined to it's caller.
     cprintf("thread_join: not a caller\n");
     release(&ptable.lock);
     return -1;
-  }*/
+  }
 
   // * Step 2) wait until current thread end.
   while(1){ // * Circular Wait.
-    if(((tgtthread->thread->exitcalled == 1) && (tgtthread->state == ZOMBIE))){ 
+    if((tgtthread->thread->exitcalled == 1) && (tgtthread->state == ZOMBIE)){
       // * Current thread had just been ended.
       // * Step 3) Save Return Value.
       *retval = tgtthread->thread->retval;
@@ -950,7 +937,7 @@ cleanupthread(struct proc* tgtthread){
 }
 
 //*purgethreads()
-//* Kill all thread it have except exception.
+//* Kill all thread it have.
 void
 purgethreads(struct proc* p, struct proc* exception){
   struct proc* tgt;
@@ -960,13 +947,7 @@ purgethreads(struct proc* p, struct proc* exception){
       if(tgt != exception && tgt->thread->parent == p){
         //* If current thread is not the exception (thread must be alive) 
 	//and current thread's parent is the same process passed from argument.
-	//cleanupthread(tgt);
-	acquire(&ptable.lock);
-	tgt->killed = 1;
-	if(tgt->state == SLEEPING){
-	  tgt->state = RUNNABLE;
-	}
-	release(&ptable.lock);
+	cleanupthread(tgt);
       }
     }
   }

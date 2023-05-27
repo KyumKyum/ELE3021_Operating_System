@@ -16,10 +16,6 @@ thread_create(thread_t *thread, void*(*start_routine)(void*), void *arg){
   thread->start_routine = start_routine;
   thread->arg = arg;
 
-  //cprintf("Addr: start_routine: %d\n", &start_routine);
-  //cprintf("Addr: arg: %d\n", &arg);
-  //cprintf("Before bind\n");
-  //cprintf("Args: %s", (char*)arg);
   if(allocthread(thread) < 0) //* Error: Thread allocation Failed. 
     return -1;
 
