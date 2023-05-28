@@ -49,7 +49,6 @@ int rear = 0; //* Indicates the last element. e.g.)  execute's stacksize.
 
   switch(cmd){
     case LIST: //* list
-      
       if(list() < 0){
 	printf(0, "Pmanager: Unexpected Error Occured while executing command \"%s\", shutting down pmanager.\n", buf);
         exit(); //* Unexpected Error
