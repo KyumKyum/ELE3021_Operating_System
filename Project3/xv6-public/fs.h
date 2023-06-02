@@ -21,9 +21,17 @@ struct superblock {
   uint bmapstart;    // Block number of first free map block
 };
 
-#define NDIRECT 12
+#define NDIRECT 10 //* Reduced NDIRECT num
+		   //* Cannot Add multiple indirect without reducing Ndirect
+		   //* Changed size of dinode will leads to error
+		   //* mkfs.c:84: main: Assertion `(BSIZE % sizeof(struct dinode)) == 0' failed.
 #define NINDIRECT (BSIZE / sizeof(uint))
+#define DINDIRECT (128 * NINDIRECT)
+#define TINDIRECT (128 * DINDIRECT)
 #define MAXFILE (NDIRECT + NINDIRECT)
+
+#define LAYERLIMIT 128
+#define LARGELAYERLIMIT 16384
 
 // On-disk inode structure
 struct dinode {
@@ -33,6 +41,8 @@ struct dinode {
   short nlink;          // Number of links to inode in file system
   uint size;            // Size of file (bytes)
   uint addrs[NDIRECT+1];   // Data block addresses
+  uint D_addr;		  //* Double Indirect
+  uint T_addr;		 //* Triple Indirect
 };
 
 // Inodes per block.
