@@ -23,8 +23,8 @@ struct inode {
   short nlink;
   uint size;
   uint addrs[NDIRECT+1];
-  uint D_addr;
-  uint T_addr;
+  uint D_addr;	      //* double indirect
+  uint T_addr;	      //* triple indirect
 };
 
 // table mapping major device number to
@@ -37,3 +37,4 @@ struct devsw {
 extern struct devsw devsw[];
 
 #define CONSOLE 1
+

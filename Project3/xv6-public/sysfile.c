@@ -114,43 +114,138 @@ sys_fstat(void)
   return filestat(f, st);
 }
 
+//* Move to upper plave
+static struct inode*
+create(char *path, short type, short major, short minor)
+{
+  struct inode *ip, *dp;
+  char name[DIRSIZ];
+
+  if((dp = nameiparent(path, name)) == 0)
+    return 0;
+  ilock(dp);
+
+  if((ip = dirlookup(dp, name, 0)) != 0){
+    iunlockput(dp);
+    ilock(ip);
+    if((type == T_FILE && ip->type == T_FILE) 
+		    || type == T_SBLK) { 
+      //* Return newly created inode - file and symbolic link
+      return ip;
+    }
+
+    iunlockput(ip);
+    return 0;
+  }
+
+  if((ip = ialloc(dp->dev, type)) == 0)
+    panic("create: ialloc");
+
+  ilock(ip);
+  ip->major = major;
+  ip->minor = minor;
+  ip->nlink = 1;
+  iupdate(ip);
+
+  if(type == T_DIR){  // Create . and .. entries.
+    dp->nlink++;  // for ".."
+    iupdate(dp);
+    // No ip->nlink++ for ".": avoid cyclic ref count.
+    if(dirlink(ip, ".", ip->inum) < 0 || dirlink(ip, "..", dp->inum) < 0)
+      panic("create dots");
+  }
+
+  if(dirlink(dp, name, ip->inum) < 0)
+    panic("create: dirlink");
+
+  iunlockput(dp);
+
+  return ip;
+}
+
 // Create the path new as a link to the same inode as old.
+//* Link will now support symbolic link
 int
 sys_link(void)
 {
-  char name[DIRSIZ], *new, *old;
+  char name[DIRSIZ], *new, *old, *flag;
+  int length;
   struct inode *dp, *ip;
 
-  if(argstr(0, &old) < 0 || argstr(1, &new) < 0)
+  if(argstr(0, &flag) < 0 || argstr(1, &old) < 0 || argstr(2, &new) < 0){
+    cprintf("link: read argument failed\n");
     return -1;
+  }
 
   begin_op();
-  if((ip = namei(old)) == 0){
-    end_op();
-    return -1;
-  }
+  if(flag[0] == '-' && flag[1] == 'h'){
+    //* Standard scheme: Hard link - share I-node
+    if((ip = namei(old)) == 0){ //* namei: get inode for current old path.
+      end_op();
+      return -1;
+    }
 
-  ilock(ip);
-  if(ip->type == T_DIR){
-    iunlockput(ip);
-    end_op();
-    return -1;
-  }
+    ilock(ip);
+    if(ip->type == T_DIR){ //* If current inode is directory
+      iunlockput(ip);
+      end_op();
+      return -1;
+    }
 
-  ip->nlink++;
-  iupdate(ip);
-  iunlock(ip);
+    ip->nlink++; //* Increase inode's linked number.
+    iupdate(ip); //* iupdate() copy a modified in-memory inode to disk 
+  	         //- called after every changes of ip->xxx
+    iunlock(ip);
 
-  if((dp = nameiparent(new, name)) == 0)
-    goto bad;
-  ilock(dp);
-  if(dp->dev != ip->dev || dirlink(dp, name, ip->inum) < 0){
+    if((dp = nameiparent(new, name)) == 0) //* nameiparent: get inode of the parent, and copy.
+      goto bad;
+    ilock(dp);
+    if(dp->dev != ip->dev || dirlink(dp, name, ip->inum) < 0){
+      iunlockput(dp);
+      goto bad;
+    }
     iunlockput(dp);
-    goto bad;
-  }
-  iunlockput(dp);
-  iput(ip);
+    iput(ip);
+  }else if(flag[0] == '-' && flag[1] == 's'){
+    //* Create Symbolic Link
+    //* Implemeted based on sys_mkdir, sys_link.
+    //* Strategy: 
+    //*		- make a new inode with symbolic type.
+    //*		- save path (old) information in inode - using writei to write data
+    //*		- will refer saved path while operating in this inode.
 
+    //* Step 1) create new inode in symbolic link type
+    if((ip = create(new, T_SBLK, 0, 0)) == 0){ //* T_SBLK: symbolic type - need to be differentiated.
+      end_op();
+      cprintf("Error while creating symlink\n");
+      return -1;
+    } 
+    //* old: will be path for current symbolic link.
+    
+    //* Step 2) Save path information in current inode.
+    //* Required info: path length, path string
+    /*
+      --------
+     |  path  |
+     | length |
+      --------
+     |  path  |
+     |(string)|
+      --------
+     */
+    //* later used to refer current path and namei() it.
+    length = strlen(old);
+    //* Lock
+    //ilock(ip);
+
+    //* Write path length and path info
+    writei(ip, (char*)&length, 0, sizeof(int));
+    writei(ip, old, sizeof(int), length + 1); //* Save length information. +1 for null character '\0'
+
+    //* Unlock
+    iupdate(ip);
+    iunlockput(ip);
+  }
   end_op();
 
   return 0;
@@ -238,6 +333,7 @@ bad:
   return -1;
 }
 
+/*
 static struct inode*
 create(char *path, short type, short major, short minor)
 {
@@ -280,13 +376,55 @@ create(char *path, short type, short major, short minor)
   iunlockput(dp);
 
   return ip;
+}*/
+
+//* Modify Open - symbolic link
+//*
+
+struct inode*
+followip(struct inode* ip, char* path){
+  int length;
+  // * Check if current inode is symbolic link
+  // * if symbolic link, go to directing link and return it.
+  
+  //ilock(ip);
+
+  if(ip->type == T_SBLK) {
+    // * Current inode is symbolic link
+    // * read path length, path information in inode.
+    // * based on path information, reach inode until inode is non-symbolic link
+    do {
+      // * read first info: path length
+      readi(ip, (char*)&length, 0, sizeof(int));
+
+      // * read path info based on length info
+      // * update path info
+      readi(ip, path, sizeof(int), length + 1);
+      iunlockput(ip);
+
+      // * get inode for current path, then update ip.
+      if((ip = namei(path)) == 0){
+        // * Error: cannot find current inode
+        // * Original inode could be deleted.
+        cprintf("Error: Inode cannot found. Original file could be deleted or possible inode corruption occured.\n");
+        end_op();
+        return 0;
+      }
+      ilock(ip); // * Lock again; readi.
+      // * If newly updated ip is symbolic link,
+      // * loop again until non-symbolic found. 
+    } while(ip->type == T_SBLK);
+  }
+
+  return ip;
 }
+
 
 int
 sys_open(void)
 {
   char *path;
-  int fd, omode;
+  int fd, omode, length;
   struct file *f;
   struct inode *ip;
 
@@ -311,6 +449,33 @@ sys_open(void)
       iunlockput(ip);
       end_op();
       return -1;
+    }
+    if(ip->type == T_SBLK) {
+      // * Current inode is symbolic link
+      // * read path length, path information in inode.
+      // * based on path information, reach inode until inode is non-symbolic link.
+      
+      do {
+        // * read first info: path length
+        readi(ip, (char*)&length, 0, sizeof(int));
+
+        // * read path info based on length info
+        // * update path info
+        readi(ip, path, sizeof(int), length + 1);
+        iunlockput(ip);
+
+        // * get inode for current path, then update ip.
+        if((ip = namei(path)) == 0){
+          // * Error: cannot find current inode
+          // * Original inode could be deleted.
+          cprintf("Error: Inode cannot found. Original file could be deleted or possible inode corruption occured.\n");
+          end_op();
+          return -1;
+        }
+	ilock(ip); // * Lock again; readi.
+        // * If newly updated ip is symbolic link,
+        // * loop again until non-symbolic found.
+      } while(ip->type == T_SBLK);
     }
   }
 

@@ -26,7 +26,21 @@ exec(char *path, char **argv)
     cprintf("exec: fail\n");
     return -1;
   }
+
+  //* follow path if current ip is symbolic link
+  ////* follow path if current ip is symbolic link;;
+  //ip = followip(ip, path);
+
+
   ilock(ip);
+  ip = followip(ip, path);
+
+  if(ip == 0){
+    //iunlock(ip);
+    end_op();
+    cprintf("exec: file corrupted.\n");
+    return -1;
+  }
   pgdir = 0;
 
   // Check ELF header
