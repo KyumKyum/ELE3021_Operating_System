@@ -41,7 +41,8 @@ struct log {
   int start;
   int size;
   int outstanding; // how many FS sys calls are executing.
-  int committing;  // in commit(), please wait.
+  int committing;  // in commit(), please wait.i
+  int flushing; //* wait until flushing ends - it has to be done without intervention.
   int dev;
   struct logheader lh;
 };
@@ -122,12 +123,16 @@ recover_from_log(void)
 }
 
 // called at the start of each FS system call.
+//* changed feature in Project #3 - Buffered I/O
+//* commit() will be divided; commit - logging, sync - flushing
+//* log have to be hold integrity while logging & flushing.
+//* no wait required while flushing; it has nothing to do with outstanding value.
 void
 begin_op(void)
 {
   acquire(&log.lock);
   while(1){
-    if(log.committing){
+    if(log.committing){ 
       sleep(&log, &log.lock);
     } else if(log.lh.n + (log.outstanding+1)*MAXOPBLOCKS > LOGSIZE){
       // this op might exhaust log space; wait for commit.
@@ -142,6 +147,10 @@ begin_op(void)
 
 // called at the end of each FS system call.
 // commits if this was the last outstanding operation.
+//* Changed feature in Project #3 - buffered I/O
+//* Commit will NOT flush buffer.
+//* Flush will be totally managed by systemcall sync();
+//* After Commit, if the buffer had been full, then flush (call sync()) in end_op exceptionally.
 void
 end_op(void)
 {
@@ -166,6 +175,13 @@ end_op(void)
     // call commit w/o holding locks, since not allowed
     // to sleep with locks.
     commit();
+    
+    if(log.lh.n >= LOGSIZE){
+      //* Buffer fulled! -> flush (call sync()) exceptionally
+      cprintf("BUFFER FULL!\n");
+      sync();
+    }
+
     acquire(&log.lock);
     log.committing = 0;
     wakeup(&log);
@@ -189,15 +205,17 @@ write_log(void)
   }
 }
 
+//* Changed featurn in Project #3 - Buffered I/O
+//* commit() will not flush buffer; only logging.
 static void
 commit()
 {
   if (log.lh.n > 0) {
     write_log();     // Write modified blocks from cache to log
     write_head();    // Write header to disk -- the real commit
-    install_trans(); // Now install writes to home locations
-    log.lh.n = 0;
-    write_head();    // Erase the transaction from the log
+    //install_trans(); // Now install writes to home locations
+    //log.lh.n = 0;
+    //write_head();    // Erase the transaction from the log
   }
 }
 
@@ -230,5 +248,38 @@ log_write(struct buf *b)
     log.lh.n++;
   b->flags |= B_DIRTY; // prevent eviction
   release(&log.lock);
+}
+
+//* sync()
+//* flushes dirty buffers and executes flushed jobs.
+//* return number of flushed blocks
+//* return -1 if error occurs (failed);
+int
+sync(void){
+  int flushed = 0;
+
+  log.flushing = 1; //* Flush start; Another sync() call will be ignored.
+
+  if(log.lh.n > 0) {
+    //* Flush buffer.
+    install_trans();
+    flushed = log.lh.n;
+    log.lh.n = 0;
+    write_head();
+  }
+
+  log.flushing = 0; //* Flush end; Now another sync() call will be allowed.
+
+  return flushed;
+}
+
+int
+sys_sync(){
+  if(log.flushing == 1){
+    //* Currently flushing buffers!
+    cprintf("sync: busy!\n");
+    return -1;
+  }
+  return sync();
 }
 
