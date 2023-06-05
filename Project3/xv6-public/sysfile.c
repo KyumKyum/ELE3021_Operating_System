@@ -407,7 +407,7 @@ followip(struct inode* ip, char* path){
         // * Error: cannot find current inode
         // * Original inode could be deleted.
         cprintf("Error: Inode cannot found. Original file could be deleted or possible inode corruption occured.\n");
-        end_op();
+        //end_op();
         return 0;
       }
       ilock(ip); // * Lock again; readi.
@@ -445,12 +445,12 @@ sys_open(void)
       return -1;
     }
     ilock(ip);
-    if(ip->type == T_DIR && omode != O_RDONLY){
+    if(ip->type == T_DIR && (omode != O_RDONLY && omode != O_NFSBLK)){ //* not readonly nor not follow
       iunlockput(ip);
       end_op();
       return -1;
     }
-    if(ip->type == T_SBLK) {
+    if(ip->type == T_SBLK && (omode != O_NFSBLK)) { //* will not follow if this omode is O_NFSBLK (not follow symbolic link).
       // * Current inode is symbolic link
       // * read path length, path information in inode.
       // * based on path information, reach inode until inode is non-symbolic link.

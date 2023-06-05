@@ -81,6 +81,21 @@ stat(const char *n, struct stat *st)
   return r;
 }
 
+//* Same with stat, but with O_NFSBLK flag.
+int
+statnf(const char *n, struct stat *st)
+{
+  int fd;
+  int r;
+
+  fd = open(n, O_NFSBLK);
+  if(fd < 0)
+    return -1;
+  r = fstat(fd, st);
+  close(fd);
+  return r;
+}
+
 int
 atoi(const char *s)
 {

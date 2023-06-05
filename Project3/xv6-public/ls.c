@@ -2,6 +2,7 @@
 #include "stat.h"
 #include "user.h"
 #include "fs.h"
+#include "fcntl.h" //* added due to implementation of symbolic link
 
 char*
 fmtname(char *path)
@@ -30,7 +31,7 @@ ls(char *path)
   struct dirent de;
   struct stat st;
 
-  if((fd = open(path, 0)) < 0){
+  if((fd = open(path, O_NFSBLK)) < 0){ //* list -> will not follow symbolic link
     printf(2, "ls: cannot open %s\n", path);
     return;
   }
@@ -44,6 +45,8 @@ ls(char *path)
   switch(st.type){
   
   case T_SBLK: //* Symbolic Link
+    printf(1, "%s %d %d %d (Symbolic Link)\n", fmtname(path), st.type, st.ino, st.size);
+    break;
   case T_FILE:
     printf(1, "%s %d %d %d\n", fmtname(path), st.type, st.ino, st.size);
     break;
@@ -61,11 +64,15 @@ ls(char *path)
         continue;
       memmove(p, de.name, DIRSIZ);
       p[DIRSIZ] = 0;
-      if(stat(buf, &st) < 0){
+      if(statnf(buf, &st) < 0){ //* statnf: same with stat, but with O_NFSBLK flag
         printf(1, "ls: cannot stat %s\n", buf);
         continue;
       }
+      if(st.type == T_SBLK){
+        printf(1, "%s %d %d %d (Symbolic Link)\n", fmtname(buf), st.type, st.ino, st.size);
+      }else{
       printf(1, "%s %d %d %d\n", fmtname(buf), st.type, st.ino, st.size);
+      }
     }
     break;
   }
