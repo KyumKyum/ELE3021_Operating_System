@@ -373,6 +373,7 @@ static uint
 bmap(struct inode *ip, uint bn)
 {
   uint addr, *a;
+  uint f_addr, s_addr, t_addr; //* addr indicator of first layer and second layer
   struct buf *bp;
 
   if(bn < NDIRECT){
@@ -382,6 +383,7 @@ bmap(struct inode *ip, uint bn)
   }
   bn -= NDIRECT;
 
+  //* Single Indirect
   if(bn < NINDIRECT){
     // Load indirect block, allocating if necessary.
     if((addr = ip->addrs[NDIRECT]) == 0)
@@ -394,6 +396,118 @@ bmap(struct inode *ip, uint bn)
     }
     brelse(bp);
     return addr;
+  }
+  else if(bn >= NINDIRECT && bn < DINDIRECT){
+    //* Double Indirect
+    //* Step 1) Check the first indirect layer.
+    if((addr = ip->D_addr) == 0){
+      //* Not initalized; Allocation Required.
+      ip->D_addr = addr = balloc(ip->dev);
+    }
+
+    //* Step 2) Enter first layer.
+    //* Each addr in first layer will held 128 layers.
+    //* 547th block. It will firstly goes to 4th addr (addr4) in first layer.
+    //* => first layer entry index = bn/LAYERLIMIT, while LAYERLIMIT == 128
+    
+    //* Read the first indirect layer.
+    bp = bread(ip->dev,addr);
+    a = (uint*)bp->data;
+    
+    //* Set entry addr in first layer
+    f_addr = bn / LAYERLIMIT;
+    if((addr = a[f_addr]) == 0){
+      //* Allocate if necessary
+      a[f_addr] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+
+    //* Step 3) Enter second layer.
+    //* Each addr in second later will held 128 data blocks.
+    //* 547th block. It will finally set in 35th addr (addr35) in second layer.
+    //* => second layer entry index = bn % LAYERLIMIT, while LAYERLIMIT == 128	
+    
+    //* Read the second indirect layer.
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    
+    //* Set entry addr in second layer
+    s_addr = bn % LAYERLIMIT;
+    if((addr = a[s_addr]) == 0){
+      //* Allocate if necessary
+      a[s_addr] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+
+    //* Step 4) Return the destination address.
+    return addr;
+  }else if(bn >= DINDIRECT && bn < TINDIRECT){
+    //* Triple Indirect
+    //* It will be the same logic with double indrect but more layers.
+    if((addr = ip->T_addr) == 0){
+      //* Not initalized; Allocation Required.
+      ip->T_addr = addr = balloc(ip->dev);
+    }
+
+    //* Step 2) Enter first layer.
+    //* Each addr in first layer will held 128 second layers, which also held 128 layers
+    //* => The single addr in first layer will hold 16384 daya blockd
+    //* => first layer entry index = bn/LARGELAYERLIMIT, while LARGELAYERLIMIT == 16384
+
+    //* Read the first indirect layer.
+    bp = bread(ip->dev,addr);
+    a = (uint*)bp->data;
+
+    //* Set entry addr in first layer
+    f_addr = bn / LARGELAYERLIMIT;
+    if((addr = a[f_addr]) == 0){
+      //* Allocate if necessary
+      a[f_addr] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+
+    //* Step 3) Enter second layer.
+    //* Each addr in second later will held 128 layers.
+    //* Its index will be computed same way for first layer in double indirect
+    //* => second layer entry index = (bn % LARGELAYERLIMIT)/LAYERLIMIT
+
+    //* Read the second indirect layer.
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+
+    //* Set entry addr in second layer
+    s_addr = (bn % LARGELAYERLIMIT)/LAYERLIMIT;
+    if((addr = a[s_addr]) == 0){
+      //* Allocate if necessary
+      a[s_addr] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+
+    //* Step 4) Enter third layer
+    //* Each addr in third layer will held 128 data blocks
+    //* Its index will be couputed in same way for second layer in double indirect.
+    //* => third layer enter index = (bn % LARGELAYERLIMIT)%LAYERLIMIT.
+
+    //* Read the third indirect layer.
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+
+    //* Set entry addr in third layer
+    t_addr = (bn % LARGELAYERLIMIT) % LAYERLIMIT;
+    if((addr = a[t_addr]) == 0){
+      //* Allocate if necessary
+      a[t_addr] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+
+    //* Step 5) Return the destination address
+    return addr;
+
   }
 
   panic("bmap: out of range");
@@ -655,6 +769,8 @@ namex(char *path, int nameiparent, char *name)
   }
   return ip;
 }
+
+
 
 struct inode*
 namei(char *path)

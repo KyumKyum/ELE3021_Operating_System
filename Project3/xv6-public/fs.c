@@ -397,7 +397,10 @@ bmap(struct inode *ip, uint bn)
     brelse(bp);
     return addr;
   }
-  else if(bn >= NINDIRECT && bn < DINDIRECT){
+
+  bn -= NINDIRECT;
+
+  if(bn < DINDIRECT){
     //* Double Indirect
     //* Step 1) Check the first indirect layer.
     if((addr = ip->D_addr) == 0){
@@ -443,7 +446,11 @@ bmap(struct inode *ip, uint bn)
 
     //* Step 4) Return the destination address.
     return addr;
-  }else if(bn >= DINDIRECT && bn < TINDIRECT){
+  }
+
+  bn -= DINDIRECT;
+  
+  if(bn < TINDIRECT){
     //* Triple Indirect
     //* It will be the same logic with double indrect but more layers.
     if((addr = ip->T_addr) == 0){

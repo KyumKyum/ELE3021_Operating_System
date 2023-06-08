@@ -49,7 +49,7 @@ struct log {
 struct log log;
 
 static void recover_from_log(void);
-static void commit();
+//static void commit();
 
 void
 initlog(int dev)
@@ -134,8 +134,13 @@ begin_op(void)
   while(1){
     if(log.committing){ 
       sleep(&log, &log.lock);
-    } else if(log.lh.n + (log.outstanding+1)*MAXOPBLOCKS > LOGSIZE){
+    } else if(log.lh.n + (log.outstanding+1)*MAXOPBLOCKS > LOGSIZE -1){
       // this op might exhaust log space; wait for commit.
+      //* If log size fulled in the begining, it might be too late to handle.
+      //* Flush immediately
+      cprintf("Commiting...!!: log filled: %d\n", log.lh.n);
+      //* Need to be flushed
+      //sync();
       sleep(&log, &log.lock);
     } else {
       log.outstanding += 1;
@@ -148,7 +153,7 @@ begin_op(void)
 // called at the end of each FS system call.
 // commits if this was the last outstanding operation.
 //* Changed feature in Project #3 - buffered I/O
-//* Commit will NOT flush buffer.
+//* end_op will now not perform commit.
 //* Flush will be totally managed by systemcall sync();
 //* After Commit, if the buffer had been full, then flush (call sync()) in end_op exceptionally.
 void
@@ -161,23 +166,32 @@ end_op(void)
   if(log.committing)
     panic("log.committing");
   if(log.outstanding == 0){
-    do_commit = 1;
-    log.committing = 1;
+    wakeup(&log);
+    //do_commit = 1;
+    //log.committing = 1;
   } else {
     // begin_op() may be waiting for log space,
     // and decrementing log.outstanding has decreased
     // the amount of reserved space.
-    wakeup(&log);
+    //cprintf("Wake up\n");
+    //wakeup(&log);
   }
   release(&log.lock);
+
+  /*if(log.lh.n >= LOGSIZE -2){
+    cprintf("BUFFER FULL!!\n");
+    sync();
+  }*/
 
   if(do_commit){
     // call commit w/o holding locks, since not allowed
     // to sleep with locks.
-    commit();
-    
-    if(log.lh.n >= LOGSIZE){
-      //* Buffer fulled! -> flush (call sync()) exceptionally
+    //commit();
+    //
+    //sync();
+	    
+    if(log.lh.n >= LOGSIZE - 2){
+      // * Buffer fulled! -> flush (call sync()) exceptionally
       cprintf("BUFFER FULL!\n");
       sync();
     }
@@ -207,7 +221,7 @@ write_log(void)
 
 //* Changed featurn in Project #3 - Buffered I/O
 //* commit() will not flush buffer; only logging.
-static void
+/*static void
 commit()
 {
   if (log.lh.n > 0) {
@@ -217,7 +231,7 @@ commit()
     //log.lh.n = 0;
     //write_head();    // Erase the transaction from the log
   }
-}
+}*/
 
 // Caller has modified b->data and is done with the buffer.
 // Record the block number and pin in the cache with B_DIRTY.
@@ -256,30 +270,63 @@ log_write(struct buf *b)
 //* return -1 if error occurs (failed);
 int
 sync(void){
+  cprintf("sync called\n");
   int flushed = 0;
+  //int loglocked = log.lock.locked;
 
-  log.flushing = 1; //* Flush start; Another sync() call will be ignored.
+  //if(loglocked == 0)
+    //acquire(&log.lock);
+
+  /*while (log.outstanding > 0){
+    sleep(&log, &log.lock);
+  }*/
+
+  /*if (log.committing){
+    while (log.committing)
+      sleep(&log, &log.lock);
+
+    if (!loglocked) release(&log.lock);
+      return -1;
+  }*/
+
+  log.committing = 1;  
+  //log.committing = 1;
+  log.flushing = 1; // * Flush start; Another sync() call will be ignored.
+  
+  //if(loglocked == 0)
+    //release(&log.lock);
 
   if(log.lh.n > 0) {
-    //* Flush buffer.
+    // * Flush buffer.
+    write_log();     // Write modified blocks from cache to log
+    write_head();
     install_trans();
     flushed = log.lh.n;
     log.lh.n = 0;
     write_head();
   }
 
-  log.flushing = 0; //* Flush end; Now another sync() call will be allowed.
-
+  //if(loglocked == 0)
+    //acquire(&log.lock);
+  
+  log.committing = 0;
+  log.flushing = 0; // * Flush end; Now another sync() call will be allowed.
+  
+  //if(loglocked == 0)
+    //release(&log.lock);
   return flushed;
 }
 
 int
 sys_sync(){
+  int ret = 0;
   if(log.flushing == 1){
     //* Currently flushing buffers!
     cprintf("sync: busy!\n");
     return -1;
   }
-  return sync();
+
+  ret = sync();
+  return ret;
 }
 

@@ -30,6 +30,31 @@ save(void)
 }
 
 void
+modify(void)
+{
+  int fd;
+  char* str = "New String\n";
+
+  fd = open("filetest", O_WRONLY);
+  
+  if(fd < 0){
+    printf(0,"error: write failed in modify\n");
+  }
+
+  int size = sizeof(str);
+
+  if(write(fd, &str, size) != size){
+    printf(0,"write failed in modify.\n");
+    exit();
+  }
+
+  printf(0, "write ok\n");
+  //sync();
+  close(fd);
+	 
+}
+
+void
 load(void)
 {
     int fd;
@@ -50,6 +75,7 @@ load(void)
     }
     printf(0, "file content (string): %s", str);
     printf(0, "read ok\n");
+    //sync();
     close(fd);
 }
 
@@ -57,6 +83,7 @@ int
 main(void)
 {
     save();
+    modify();
     load();
 
     exit();

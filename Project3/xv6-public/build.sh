@@ -1,5 +1,5 @@
 #!/bin/bash
 
 set -e #exit when command fails
-make
+make -j
 make fs.img

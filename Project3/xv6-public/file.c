@@ -144,8 +144,10 @@ filewrite(struct file *f, char *addr, int n)
       iunlock(f->ip);
       end_op();
 
-      if(r < 0)
+      if(r < 0){
+        cprintf("error after return on writei");
         break;
+      }
       if(r != n1)
         panic("short filewrite");
       i += r;
