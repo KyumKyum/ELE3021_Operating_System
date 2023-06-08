@@ -19,7 +19,7 @@ main(int argc, char *argv[])
     char data[BUFSIZE];
     char buf[BUFSIZE];
 
-    printf(1, "filesizetest starting\n");
+    printf(1, "test_bigfile starting\n");
     const int sz = sizeof(data);
     for (i = 0; i < sz; i++) {
         data[i] = i % 128;

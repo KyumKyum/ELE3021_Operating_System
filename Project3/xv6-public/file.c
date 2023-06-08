@@ -145,7 +145,7 @@ filewrite(struct file *f, char *addr, int n)
       end_op();
 
       if(r < 0){
-        cprintf("error after return on writei");
+        //cprintf("error after return on writei");
         break;
       }
       if(r != n1)

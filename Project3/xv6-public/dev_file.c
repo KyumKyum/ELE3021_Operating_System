@@ -49,7 +49,7 @@ modify(void)
   }
 
   printf(0, "write ok\n");
-  //sync();
+  sync();
   close(fd);
 	 
 }
@@ -75,7 +75,6 @@ load(void)
     }
     printf(0, "file content (string): %s", str);
     printf(0, "read ok\n");
-    //sync();
     close(fd);
 }
 

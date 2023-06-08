@@ -49,6 +49,8 @@ struct log {
 struct log log;
 
 static void recover_from_log(void);
+int sync(void);
+int flush(void);
 //static void commit();
 
 void
@@ -123,10 +125,11 @@ recover_from_log(void)
 }
 
 // called at the start of each FS system call.
-//* changed feature in Project #3 - Buffered I/O
-//* commit() will be divided; commit - logging, sync - flushing
-//* log have to be hold integrity while logging & flushing.
-//* no wait required while flushing; it has nothing to do with outstanding value.
+//* Changed feature in Project #3 - Buffered I/O
+//* begin_op will do one more job; call sync() if buffer fulled.
+//* Standard of full: LOGSIZE - 2 (Some blocks need to be reserved for log operation. I set this reserve amount as 2 blocks.)
+//* Based on log number and # outstanding blocks, check if the log full.
+//* If the log full, call sync(), flush the buffer. 
 void
 begin_op(void)
 {
@@ -134,14 +137,10 @@ begin_op(void)
   while(1){
     if(log.committing){ 
       sleep(&log, &log.lock);
-    } else if(log.lh.n + (log.outstanding+1)*MAXOPBLOCKS > LOGSIZE -1){
+    } else if(log.lh.n + (log.outstanding+1)*MAXOPBLOCKS > LOGSIZE - 2){ //* Reserve for 2 block for log operation
       // this op might exhaust log space; wait for commit.
-      //* If log size fulled in the begining, it might be too late to handle.
-      //* Flush immediately
-      cprintf("Commiting...!!: log filled: %d\n", log.lh.n);
-      //* Need to be flushed
-      //sync();
-      sleep(&log, &log.lock);
+      //sleep(&log, &log.lock);
+      sync();
     } else {
       log.outstanding += 1;
       release(&log.lock);
@@ -153,54 +152,29 @@ begin_op(void)
 // called at the end of each FS system call.
 // commits if this was the last outstanding operation.
 //* Changed feature in Project #3 - buffered I/O
-//* end_op will now not perform commit.
+//* Commit will NOT flush buffer.
 //* Flush will be totally managed by systemcall sync();
-//* After Commit, if the buffer had been full, then flush (call sync()) in end_op exceptionally.
+//* end_op will now just resolve outstanding block; reduce the number if end_op called.
+//* It will work like an 'marker'. (Mark the range of operation need to be logged.)
 void
 end_op(void)
 {
-  int do_commit = 0;
-
   acquire(&log.lock);
+  //* Resolve Outstanding Block
   log.outstanding -= 1;
-  if(log.committing)
-    panic("log.committing");
-  if(log.outstanding == 0){
-    wakeup(&log);
-    //do_commit = 1;
-    //log.committing = 1;
-  } else {
-    // begin_op() may be waiting for log space,
-    // and decrementing log.outstanding has decreased
-    // the amount of reserved space.
-    //cprintf("Wake up\n");
-    //wakeup(&log);
+
+  if (log.outstanding == 0){
+    //* It won't call sync
+    //* As all outstanding blocks are resloved,
+    //* Wake the log wating the outstanding blocks to be resolved.
+    wakeup(&log); //* This wakeup is for waiting log in sync();
   }
+
+  //* for the case log.outstanding > 0
+  //* begin_op() will now not sleep if the buffer is full.
+  //* No need to wait such condition; begin_op will immediately flush the buffer.
+
   release(&log.lock);
-
-  /*if(log.lh.n >= LOGSIZE -2){
-    cprintf("BUFFER FULL!!\n");
-    sync();
-  }*/
-
-  if(do_commit){
-    // call commit w/o holding locks, since not allowed
-    // to sleep with locks.
-    //commit();
-    //
-    //sync();
-	    
-    if(log.lh.n >= LOGSIZE - 2){
-      // * Buffer fulled! -> flush (call sync()) exceptionally
-      cprintf("BUFFER FULL!\n");
-      sync();
-    }
-
-    acquire(&log.lock);
-    log.committing = 0;
-    wakeup(&log);
-    release(&log.lock);
-  }
 }
 
 // Copy modified blocks from cache to log.
@@ -264,41 +238,50 @@ log_write(struct buf *b)
   release(&log.lock);
 }
 
+
 //* sync()
-//* flushes dirty buffers and executes flushed jobs.
-//* return number of flushed blocks
-//* return -1 if error occurs (failed);
+//* sync will check the buffer and flush it.
+// Step 1) If the lock isn't held (e.g. called from user program.) it will internally acquire log.lock.
+// Step 2) If there is still outstanding block, wait until it resolved (wait until end_op calls)
+// Step 3) Flush the buffer, write the changes on the disk
+// Step 4) if the log.lock acquired internally, release it.
 int
 sync(void){
-  cprintf("sync called\n");
+  int logLocked = log.lock.locked; //* check log lock state
+  int blockConsumed = 0; //* Value need to be returned; # block flushed.
+
+  if(logLocked == 0){ //* If the lock isn't held
+    acquire(&log.lock); //* Call Internally
+  }
+
+  while(log.outstanding > 0){ //* If there is an outstanding block
+    sleep(&log, &log.lock); //* Wait for it
+  }
+
+  blockConsumed = flush(); //* Flush buffers
+
+  if(logLocked == 0){ //* If the lock called internally
+    release(&log.lock);   //* release the lock.
+  }
+
+  return blockConsumed; //* Return # block flushed
+}
+
+//* flush()
+//* flush will do the original commit job.
+//* remove the all elements in buffer, and write those contents into disk.
+int
+flush(void){
   int flushed = 0;
-  //int loglocked = log.lock.locked;
 
-  //if(loglocked == 0)
-    //acquire(&log.lock);
+  //* Prevent flush if currenlty commiting
+  log.committing = 1;
+  release(&log.lock); //* release the log lock
+  log.flushing = 1; //* Flush start; Another sync() call will be ignored.
 
-  /*while (log.outstanding > 0){
-    sleep(&log, &log.lock);
-  }*/
-
-  /*if (log.committing){
-    while (log.committing)
-      sleep(&log, &log.lock);
-
-    if (!loglocked) release(&log.lock);
-      return -1;
-  }*/
-
-  log.committing = 1;  
-  //log.committing = 1;
-  log.flushing = 1; // * Flush start; Another sync() call will be ignored.
-  
-  //if(loglocked == 0)
-    //release(&log.lock);
-
-  if(log.lh.n > 0) {
-    // * Flush buffer.
-    write_log();     // Write modified blocks from cache to log
+  if(log.lh.n > 0) { //* Original Commit Call
+    //* Flush buffer.
+    write_log();
     write_head();
     install_trans();
     flushed = log.lh.n;
@@ -306,27 +289,22 @@ sync(void){
     write_head();
   }
 
-  //if(loglocked == 0)
-    //acquire(&log.lock);
-  
+  acquire(&log.lock); //* acquire the log lock
+  //* release & acquire are implemented in here based on original end_op call.
+  //* without these calls, it will panic ("sched locks"), which is a deadlock in xv6.
   log.committing = 0;
-  log.flushing = 0; // * Flush end; Now another sync() call will be allowed.
-  
-  //if(loglocked == 0)
-    //release(&log.lock);
+  log.flushing = 0; //* Flush end; Now another sync() call will be allowed.
+
   return flushed;
 }
 
 int
 sys_sync(){
-  int ret = 0;
   if(log.flushing == 1){
     //* Currently flushing buffers!
     cprintf("sync: busy!\n");
     return -1;
   }
-
-  ret = sync();
-  return ret;
+  return sync();
 }
 
