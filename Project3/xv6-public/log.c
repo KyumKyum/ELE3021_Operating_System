@@ -193,20 +193,6 @@ write_log(void)
   }
 }
 
-//* Changed featurn in Project #3 - Buffered I/O
-//* commit() will not flush buffer; only logging.
-/*static void
-commit()
-{
-  if (log.lh.n > 0) {
-    write_log();     // Write modified blocks from cache to log
-    write_head();    // Write header to disk -- the real commit
-    //install_trans(); // Now install writes to home locations
-    //log.lh.n = 0;
-    //write_head();    // Erase the transaction from the log
-  }
-}*/
-
 // Caller has modified b->data and is done with the buffer.
 // Record the block number and pin in the cache with B_DIRTY.
 // commit()/write_log() will do the disk write.
@@ -305,6 +291,7 @@ sys_sync(){
     cprintf("sync: busy!\n");
     return -1;
   }
+  
   return sync();
 }
 
