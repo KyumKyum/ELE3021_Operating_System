@@ -1,4 +1,5 @@
-⚠️Use this only for your information or studying purpose.⚠️\n
+⚠️Use this only for your information or studying purpose.⚠️
+
 ⚠️오직 참고용, 혹은 공부용으로만 사용해주세요. Code를 그대로 사용할 시, Cheating에 걸리게 됩니다.⚠️
 
 #Project 1
